@@ -7,6 +7,7 @@ import ExpressionPreview from '@/components/ExpressionPreview';
 import DifficultySelector from '@/components/DifficultySelector';
 import PuzzleResultModal from '@/components/PuzzleResultModal';
 import BottomGameActions from '@/components/BottomGameActions';
+import InlineOperatorMenu from '@/components/InlineOperatorMenu';
 
 import { SoloGameState, PuzzleDifficulty } from '@/lib/puzzleTypes';
 import { InlineOperator } from '@/types/game';
@@ -290,6 +291,21 @@ export default function SoloGamePage() {
   const hasSelectedRange =
     gameState.selectedRange.startDigitIndex !== null &&
     gameState.selectedRange.endDigitIndex !== null;
+
+  const selStart =
+    gameState.selectedRange.startDigitIndex !== null
+      ? Math.min(gameState.selectedRange.startDigitIndex, gameState.selectedRange.endDigitIndex ?? gameState.selectedRange.startDigitIndex)
+      : null;
+  const selEnd =
+    gameState.selectedRange.startDigitIndex !== null
+      ? Math.max(gameState.selectedRange.startDigitIndex, gameState.selectedRange.endDigitIndex ?? gameState.selectedRange.startDigitIndex)
+      : null;
+
+  const exactParenthesisMatch = gameState.parentheses.find(
+    (p) => p.startDigitIndex === selStart && p.endDigitIndex === selEnd
+  );
+  const selectedParenthesisId = exactParenthesisMatch ? exactParenthesisMatch.id : null;
+
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col items-center px-4 md:px-8 py-8 md:py-12 selection:bg-gray-200 font-sans">
       <div className="w-full max-w-3xl flex flex-col flex-grow">
@@ -311,14 +327,23 @@ export default function SoloGamePage() {
                 operatorSlots={gameState.operatorSlots}
                 parentheses={gameState.parentheses}
                 selectedRange={gameState.selectedRange}
-                inlineMenu={gameState.inlineMenu}
                 lastChangedSlotIndex={lastChangedSlotIndex}
                 onDigitClick={handleDigitClick}
                 onOpenMenu={handleOpenMenu}
-                onCloseMenu={handleCloseMenu}
-                onSelectOperator={handleSelectOperator}
-                onDeleteParenthesis={handleDeleteParenthesis}
               />
+
+              <div className="h-[72px] mt-[-1rem] mb-4 flex items-center justify-center">
+                {gameState.inlineMenu.openSlotIndex !== null && (
+                  <InlineOperatorMenu
+                    currentOperator={
+                      gameState.operatorSlots.find((s) => s.index === gameState.inlineMenu.openSlotIndex)?.operator ?? null
+                    }
+                    onSelect={(newOperator) =>
+                      handleSelectOperator(gameState.inlineMenu.openSlotIndex!, newOperator)
+                    }
+                  />
+                )}
+              </div>
 
               {/* Unified Equation Preview */}
               <ExpressionPreview
@@ -338,7 +363,11 @@ export default function SoloGamePage() {
                 onResetClick={handleResetClick}
                 onSubmitClick={handleSubmit}
                 onWrapParentheses={handleWrapParentheses}
+                onUnwrapParentheses={() => {
+                  if (selectedParenthesisId) handleDeleteParenthesis(selectedParenthesisId);
+                }}
                 hasSelectedRange={hasSelectedRange}
+                selectedParenthesisId={selectedParenthesisId}
               />
             </>
           )}
