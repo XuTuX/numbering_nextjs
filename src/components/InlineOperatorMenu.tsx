@@ -18,10 +18,14 @@ export default function InlineOperatorMenu({
 
   return (
     <div
-      className="w-full max-w-lg mx-auto flex items-center justify-center gap-2 p-2 transition-all duration-200 ease-out"
+      className="w-full max-w-lg mx-auto flex flex-col items-center justify-center gap-2 p-2 transition-all duration-200 ease-out"
       role="dialog"
       aria-label={ariaLabelPrefix}
+      onClick={(event) => event.stopPropagation()}
     >
+      <div className="text-xs font-medium text-gray-500">
+        선택한 위치에 넣을 기호를 고르세요.
+      </div>
       <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm">
         {operators.map((op) => {
           const isSelected = currentOperator === op;

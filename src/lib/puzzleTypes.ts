@@ -1,4 +1,4 @@
-import { OperatorSlot, ParenthesisRange, NumberRangeSelection, InlineMenuState } from '@/types/game';
+import { EditorSelection, OperatorSlot, ParenthesisRange } from '@/types/game';
 
 export type OperatorToken = '+' | '-' | '×' | '÷' | '=' | '(' | ')';
 
@@ -23,8 +23,7 @@ export interface SoloGameState {
   digits: string[];
   operatorSlots: OperatorSlot[];
   parentheses: ParenthesisRange[];
-  selectedRange: NumberRangeSelection;
-  inlineMenu: InlineMenuState;
+  selection: EditorSelection;
   hintCount: number;
   startedAt: number;
   status: 'playing' | 'correct' | 'wrong' | 'idle';

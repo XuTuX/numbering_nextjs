@@ -30,7 +30,10 @@ export default function BottomGameActions({
   const isHard = difficulty === 'HARD';
 
   return (
-    <div className="mx-auto mt-6 w-full max-w-lg px-2">
+    <div
+      className="mx-auto mt-6 w-full max-w-lg px-2"
+      onClick={(event) => event.stopPropagation()}
+    >
       <div className="flex items-center justify-between gap-2 sm:gap-3">
         <button
           onClick={onHintClick}

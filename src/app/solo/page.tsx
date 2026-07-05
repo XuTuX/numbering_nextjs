@@ -21,8 +21,7 @@ export default function SoloGamePage() {
     digits: [],
     operatorSlots: [],
     parentheses: [],
-    selectedRange: { startDigitIndex: null, endDigitIndex: null },
-    inlineMenu: { openSlotIndex: null },
+    selection: { type: 'none' },
     hintCount: 3,
     startedAt: 0,
     status: 'idle',
@@ -61,8 +60,7 @@ export default function SoloGamePage() {
       digits: puzzle.digits,
       operatorSlots,
       parentheses: [],
-      selectedRange: { startDigitIndex: null, endDigitIndex: null },
-      inlineMenu: { openSlotIndex: null },
+      selection: { type: 'none' },
       hintCount: 3,
       startedAt: Date.now(),
       status: 'playing',
@@ -79,40 +77,48 @@ export default function SoloGamePage() {
     setWarningMessage('');
 
     setGameState(prev => {
-      const { startDigitIndex, endDigitIndex } = prev.selectedRange;
+      const selection = prev.selection;
 
-      // 1. Nothing selected yet -> set start
-      if (startDigitIndex === null) {
+      if (selection.type !== 'range') {
         return {
           ...prev,
-          selectedRange: { startDigitIndex: index, endDigitIndex: null },
-          inlineMenu: { openSlotIndex: null },
+          selection: { type: 'range', startDigitIndex: index, endDigitIndex: null },
         };
       }
 
-      // 2. Start is selected and user clicked it again -> deselect
+      const { startDigitIndex, endDigitIndex } = selection;
+
+      // 1. Start is selected and user clicked it again -> deselect
       if (startDigitIndex === index && endDigitIndex === null) {
         return {
           ...prev,
-          selectedRange: { startDigitIndex: null, endDigitIndex: null },
-          inlineMenu: { openSlotIndex: null },
+          selection: { type: 'none' },
         };
       }
 
-      // 3. Start is selected, user clicked a different digit -> set end
+      if (endDigitIndex !== null) {
+        const start = Math.min(startDigitIndex, endDigitIndex);
+        const end = Math.max(startDigitIndex, endDigitIndex);
+        if (start <= index && index <= end) {
+          return {
+            ...prev,
+            selection: { type: 'none' },
+          };
+        }
+      }
+
+      // 2. Start is selected, user clicked a different digit -> set end
       if (endDigitIndex === null) {
         return {
           ...prev,
-          selectedRange: { startDigitIndex, endDigitIndex: index },
-          inlineMenu: { openSlotIndex: null },
+          selection: { type: 'range', startDigitIndex, endDigitIndex: index },
         };
       }
 
-      // 4. Both selected, clicking any digit -> reset selection to new start
+      // 3. Both selected, clicking outside the range -> reset selection to new start
       return {
         ...prev,
-        selectedRange: { startDigitIndex: index, endDigitIndex: null },
-        inlineMenu: { openSlotIndex: null },
+        selection: { type: 'range', startDigitIndex: index, endDigitIndex: null },
       };
     });
   };
@@ -120,8 +126,8 @@ export default function SoloGamePage() {
   // Hard mode: wrap selection with parentheses
   const handleWrapParentheses = () => {
     if (gameState.status !== 'playing') return;
-    const { startDigitIndex, endDigitIndex } = gameState.selectedRange;
-    if (startDigitIndex === null || endDigitIndex === null) return;
+    if (gameState.selection.type !== 'range' || gameState.selection.endDigitIndex === null) return;
+    const { startDigitIndex, endDigitIndex } = gameState.selection;
 
     const start = Math.min(startDigitIndex, endDigitIndex);
     const end = Math.max(startDigitIndex, endDigitIndex);
@@ -159,8 +165,7 @@ export default function SoloGamePage() {
       return {
         ...prev,
         parentheses: [...prev.parentheses, newParenthesis],
-        selectedRange: { startDigitIndex: null, endDigitIndex: null },
-        inlineMenu: { openSlotIndex: null },
+        selection: { type: 'none' },
       };
     });
     setWarningMessage('');
@@ -170,19 +175,19 @@ export default function SoloGamePage() {
     setGameState(prev => ({
       ...prev,
       parentheses: prev.parentheses.filter(p => p.id !== id),
-      selectedRange: { startDigitIndex: null, endDigitIndex: null },
+      selection: { type: 'none' },
     }));
     setWarningMessage('');
   };
 
-  const handleOpenMenu = (index: number) => {
+  const handleSelectSlot = (index: number) => {
     if (gameState.status !== 'playing') return;
     setWarningMessage('');
     setGameState(prev => ({
       ...prev,
-      inlineMenu: {
-        openSlotIndex: prev.inlineMenu.openSlotIndex === index ? null : index,
-      },
+      selection: prev.operatorSlots.find((slot) => slot.index === index)?.operator
+        ? { type: 'operator', slotIndex: index }
+        : { type: 'slot', slotIndex: index },
     }));
   };
 
@@ -200,7 +205,7 @@ export default function SoloGamePage() {
       return {
         ...prev,
         operatorSlots: newSlots,
-        inlineMenu: { openSlotIndex: null },
+        selection: { type: 'none' },
       };
     });
 
@@ -216,11 +221,18 @@ export default function SoloGamePage() {
       ...prev,
       operatorSlots: prev.operatorSlots.map(s => ({ ...s, operator: null })),
       parentheses: [],
-      selectedRange: { startDigitIndex: null, endDigitIndex: null },
-      inlineMenu: { openSlotIndex: null },
+      selection: { type: 'none' },
     }));
     setLastChangedSlotIndex(null);
     setWarningMessage('');
+  };
+
+  const handleClearSelection = () => {
+    if (gameState.status !== 'playing') return;
+    setGameState(prev => ({
+      ...prev,
+      selection: { type: 'none' },
+    }));
   };
 
   const currentExpression = buildExpression(
@@ -281,25 +293,40 @@ export default function SoloGamePage() {
   const isSubmitEnabled = gameState.status === 'playing' && currentExpression.includes('=');
   const displayMessage = warningMessage || validationMessage;
   const hasSelectedRange =
-    gameState.selectedRange.startDigitIndex !== null &&
-    gameState.selectedRange.endDigitIndex !== null;
+    gameState.selection.type === 'range' && gameState.selection.endDigitIndex !== null;
+
+  const selectedSlotIndex =
+    gameState.selection.type === 'slot' || gameState.selection.type === 'operator'
+      ? gameState.selection.slotIndex
+      : null;
 
   const selStart =
-    gameState.selectedRange.startDigitIndex !== null
-      ? Math.min(gameState.selectedRange.startDigitIndex, gameState.selectedRange.endDigitIndex ?? gameState.selectedRange.startDigitIndex)
+    gameState.selection.type === 'range'
+      ? Math.min(
+          gameState.selection.startDigitIndex,
+          gameState.selection.endDigitIndex ?? gameState.selection.startDigitIndex
+        )
       : null;
   const selEnd =
-    gameState.selectedRange.startDigitIndex !== null
-      ? Math.max(gameState.selectedRange.startDigitIndex, gameState.selectedRange.endDigitIndex ?? gameState.selectedRange.startDigitIndex)
+    gameState.selection.type === 'range'
+      ? Math.max(
+          gameState.selection.startDigitIndex,
+          gameState.selection.endDigitIndex ?? gameState.selection.startDigitIndex
+        )
       : null;
 
-  const exactParenthesisMatch = gameState.parentheses.find(
-    (p) => p.startDigitIndex === selStart && p.endDigitIndex === selEnd
-  );
+  const exactParenthesisMatch = hasSelectedRange
+    ? gameState.parentheses.find(
+        (p) => p.startDigitIndex === selStart && p.endDigitIndex === selEnd
+      )
+    : null;
   const selectedParenthesisId = exactParenthesisMatch ? exactParenthesisMatch.id : null;
 
   return (
-    <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col items-center px-4 md:px-8 py-8 md:py-12 selection:bg-gray-200 font-sans">
+    <div
+      className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col items-center px-4 md:px-8 py-8 md:py-12 selection:bg-gray-200 font-sans"
+      onClick={handleClearSelection}
+    >
       <div className="w-full max-w-3xl flex flex-col flex-grow">
         <SoloGameHeader
           mode="SOLO"
@@ -318,25 +345,11 @@ export default function SoloGamePage() {
                 digits={gameState.digits}
                 operatorSlots={gameState.operatorSlots}
                 parentheses={gameState.parentheses}
-                selectedRange={gameState.selectedRange}
-                activeSlotIndex={gameState.inlineMenu.openSlotIndex}
+                selection={gameState.selection}
                 lastChangedSlotIndex={lastChangedSlotIndex}
                 onDigitClick={handleDigitClick}
-                onOpenMenu={handleOpenMenu}
+                onSelectSlot={handleSelectSlot}
               />
-
-              <div className="h-[72px] mt-[-1rem] mb-4 flex items-center justify-center">
-                {gameState.inlineMenu.openSlotIndex !== null && (
-                  <InlineOperatorMenu
-                    currentOperator={
-                      gameState.operatorSlots.find((s) => s.index === gameState.inlineMenu.openSlotIndex)?.operator ?? null
-                    }
-                    onSelect={(newOperator) =>
-                      handleSelectOperator(gameState.inlineMenu.openSlotIndex!, newOperator)
-                    }
-                  />
-                )}
-              </div>
 
               {/* Unified Equation Preview */}
               <ExpressionPreview
@@ -346,6 +359,19 @@ export default function SoloGamePage() {
                 status={gameState.status}
                 warningMessage={displayMessage}
               />
+
+              <div className="mb-4 flex min-h-[96px] items-center justify-center">
+                {selectedSlotIndex !== null && (
+                  <InlineOperatorMenu
+                    currentOperator={
+                      gameState.operatorSlots.find((s) => s.index === selectedSlotIndex)?.operator ?? null
+                    }
+                    onSelect={(newOperator) =>
+                      handleSelectOperator(selectedSlotIndex, newOperator)
+                    }
+                  />
+                )}
+              </div>
 
               {/* Bottom Gameplay Actions */}
               <BottomGameActions

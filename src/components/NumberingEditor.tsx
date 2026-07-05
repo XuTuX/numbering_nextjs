@@ -2,7 +2,7 @@
 
 import React from 'react';
 import {
-  NumberRangeSelection,
+  EditorSelection,
   OperatorSlot,
   ParenthesisRange,
 } from '@/types/game';
@@ -13,11 +13,10 @@ interface NumberingEditorProps {
   digits: string[];
   operatorSlots: OperatorSlot[];
   parentheses: ParenthesisRange[];
-  selectedRange: NumberRangeSelection;
-  activeSlotIndex: number | null;
+  selection: EditorSelection;
   lastChangedSlotIndex: number | null;
   onDigitClick: (index: number) => void;
-  onOpenMenu: (index: number) => void;
+  onSelectSlot: (index: number) => void;
 }
 
 export default function NumberingEditor({
@@ -25,27 +24,26 @@ export default function NumberingEditor({
   digits,
   operatorSlots,
   parentheses,
-  selectedRange,
-  activeSlotIndex,
+  selection,
   lastChangedSlotIndex,
   onDigitClick,
-  onOpenMenu,
+  onSelectSlot,
 }: NumberingEditorProps) {
   const isHard = difficulty === 'HARD';
 
   const selectedStart =
-    selectedRange.startDigitIndex === null
+    selection.type !== 'range'
       ? null
       : Math.min(
-          selectedRange.startDigitIndex,
-          selectedRange.endDigitIndex ?? selectedRange.startDigitIndex
+          selection.startDigitIndex,
+          selection.endDigitIndex ?? selection.startDigitIndex
         );
   const selectedEnd =
-    selectedRange.startDigitIndex === null
+    selection.type !== 'range'
       ? null
       : Math.max(
-          selectedRange.startDigitIndex,
-          selectedRange.endDigitIndex ?? selectedRange.startDigitIndex
+          selection.startDigitIndex,
+          selection.endDigitIndex ?? selection.startDigitIndex
         );
 
   const getSlotOperator = (index: number) =>
@@ -65,6 +63,7 @@ export default function NumberingEditor({
         className="flex items-center justify-center text-[#151515] font-medium tracking-tight"
         style={{ fontSize: `clamp(1.5rem, ${vwScale}vw, ${maxFontSize})` }}
         aria-label="수식 편집 영역"
+        onClick={(event) => event.stopPropagation()}
       >
         {digits.map((digit, index) => {
           const opens = parentheses.filter((range) => range.startDigitIndex === index);
@@ -75,9 +74,13 @@ export default function NumberingEditor({
             selectedStart <= index &&
             index <= selectedEnd;
           const isSelectionStartOnly =
-            selectedRange.startDigitIndex === index && selectedRange.endDigitIndex === null;
+            selection.type === 'range' &&
+            selection.startDigitIndex === index &&
+            selection.endDigitIndex === null;
           const slotOperator = index < digits.length - 1 ? getSlotOperator(index) : null;
-          const isActiveSlot = activeSlotIndex === index;
+          const isActiveSlot =
+            (selection.type === 'slot' || selection.type === 'operator') &&
+            selection.slotIndex === index;
           const isChanged = lastChangedSlotIndex === index;
 
           return (
@@ -106,7 +109,7 @@ export default function NumberingEditor({
                       : 'cursor-default'
                   } ${
                     isSelected || isSelectionStartOnly
-                      ? 'bg-black/[0.05] text-black scale-105'
+                      ? 'text-black'
                       : 'bg-transparent text-black/90'
                   }`}
                   aria-label={
@@ -116,6 +119,12 @@ export default function NumberingEditor({
                   }
                 >
                   {digit}
+                  {(isSelected || isSelectionStartOnly) && (
+                    <span
+                      className="pointer-events-none absolute bottom-[0.08em] left-[0.12em] right-[0.12em] h-[0.045em] rounded-full bg-black/35"
+                      aria-hidden="true"
+                    />
+                  )}
                 </button>
               </span>
 
@@ -136,7 +145,7 @@ export default function NumberingEditor({
                 >
                   <button
                     onClick={() => {
-                      onOpenMenu(index);
+                      onSelectSlot(index);
                     }}
                     className="absolute inset-y-[-0.2em] left-1/2 flex min-h-[44px] min-w-[44px] w-[1.5em] -translate-x-1/2 items-center justify-center rounded-full outline-none"
                     aria-label={`${digits[index]}와 ${digits[index + 1]} 사이 ${
@@ -155,7 +164,7 @@ export default function NumberingEditor({
                   </button>
                   {isActiveSlot && (
                     <span
-                      className="pointer-events-none absolute left-1/2 top-[1.12em] h-1 w-4 -translate-x-1/2 rounded-full bg-black/20"
+                      className="pointer-events-none absolute left-1/2 top-[1.08em] h-[0.08em] w-4 -translate-x-1/2 rounded-full bg-black/25"
                       aria-hidden="true"
                     />
                   )}

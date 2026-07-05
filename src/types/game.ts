@@ -25,19 +25,34 @@ export type ParenthesisRange = {
   endDigitIndex: number;
 };
 
-export type NumberRangeSelection = {
+export type RangeSelection = {
   startDigitIndex: number | null;
   endDigitIndex: number | null;
 };
 
-export type InlineMenuState = {
-  openSlotIndex: number | null;
-};
+export type NumberRangeSelection = RangeSelection;
+
+export type EditorSelection =
+  | {
+      type: 'none';
+    }
+  | {
+      type: 'range';
+      startDigitIndex: number;
+      endDigitIndex: number | null;
+    }
+  | {
+      type: 'slot';
+      slotIndex: number;
+    }
+  | {
+      type: 'operator';
+      slotIndex: number;
+    };
 
 export type SoloEditorState = {
   digits: string[];
   operatorSlots: OperatorSlot[];
   parentheses: ParenthesisRange[];
-  selectedRange: NumberRangeSelection;
-  inlineMenu: InlineMenuState;
+  selection: EditorSelection;
 };
