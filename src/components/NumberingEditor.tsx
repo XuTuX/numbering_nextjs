@@ -29,7 +29,7 @@ export default function NumberingEditor({
   onDigitClick,
   onSelectSlot,
 }: NumberingEditorProps) {
-  const isHard = difficulty === 'HARD';
+
 
   const selectedStart =
     selection.type !== 'range'
@@ -95,28 +95,19 @@ export default function NumberingEditor({
                 </span>
               ))}
 
-              <span className="relative inline-flex items-center">
+              <span className="relative inline-flex items-center z-10">
                 <button
-                  aria-disabled={!isHard}
-                  tabIndex={isHard ? 0 : -1}
-                  onClick={() => {
-                    if (!isHard) return;
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
                     onDigitClick(index);
                   }}
-                  className={`relative flex h-[1.3em] min-w-[0.65em] items-center justify-center rounded-lg px-[0.1em] outline-none transition-all duration-200 ${
-                    isHard
-                      ? 'cursor-pointer hover:bg-black/[0.02]'
-                      : 'cursor-default'
-                  } ${
+                  className={`relative flex h-[1.3em] min-w-[0.65em] items-center justify-center rounded-lg px-[0.1em] outline-none transition-all duration-200 cursor-pointer hover:bg-black/[0.02] ${
                     isSelected || isSelectionStartOnly
                       ? 'text-black'
                       : 'bg-transparent text-black/90'
                   }`}
-                  aria-label={
-                    isHard
-                      ? `숫자 ${digit}, 괄호 범위 선택 ${isSelected ? '선택됨' : '가능'}`
-                      : `숫자 ${digit}`
-                  }
+                  aria-label={`숫자 ${digit}, 괄호 범위 선택 ${isSelected ? '선택됨' : '가능'}`}
                 >
                   {digit}
                   {(isSelected || isSelectionStartOnly) && (
@@ -144,7 +135,8 @@ export default function NumberingEditor({
                   style={{ width: slotOperator ? slotWidthFilled : slotWidthEmpty }}
                 >
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onSelectSlot(index);
                     }}
                     className="absolute inset-y-[-0.2em] left-1/2 flex min-h-[44px] min-w-[44px] w-[1.5em] -translate-x-1/2 items-center justify-center rounded-full outline-none"

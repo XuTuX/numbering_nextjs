@@ -47,7 +47,7 @@ export default function BottomGameActions({
           힌트
         </button>
 
-        {isHard && onWrapParentheses && (
+        {onWrapParentheses && (
           selectedParenthesisId ? (
             <button
               onClick={onUnwrapParentheses}
@@ -82,9 +82,7 @@ export default function BottomGameActions({
         <button
           onClick={onSubmitClick}
           disabled={!isSubmitEnabled}
-          className={`h-12 rounded-lg px-7 text-base font-semibold transition-all ${
-            isHard ? 'flex-[1.2]' : 'flex-[1.5]'
-          } ${
+          className={`h-12 rounded-lg px-7 text-base font-semibold transition-all flex-[1.2] ${
             isSubmitEnabled
               ? 'bg-[#111111] text-white hover:bg-[#222222] active:scale-[0.98]'
               : 'bg-[#EAEAEA] text-[#A0A0A0] cursor-not-allowed'

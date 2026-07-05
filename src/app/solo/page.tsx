@@ -71,9 +71,9 @@ export default function SoloGamePage() {
     setLastChangedSlotIndex(null);
   };
 
-  // Hard mode: Handle range selection by tapping digits
+  // Handle range selection by tapping digits
   const handleDigitClick = (index: number) => {
-    if (gameState.status !== 'playing' || gameState.difficulty !== 'HARD') return;
+    if (gameState.status !== 'playing') return;
     setWarningMessage('');
 
     setGameState(prev => {
@@ -123,7 +123,7 @@ export default function SoloGamePage() {
     });
   };
 
-  // Hard mode: wrap selection with parentheses
+  // wrap selection with parentheses
   const handleWrapParentheses = () => {
     if (gameState.status !== 'playing') return;
     if (gameState.selection.type !== 'range' || gameState.selection.endDigitIndex === null) return;
