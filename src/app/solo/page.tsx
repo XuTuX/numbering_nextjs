@@ -244,6 +244,9 @@ export default function SoloGamePage() {
 
       const result = validateEquation(currentExpression, gameState.puzzle.digitString);
       if (!result.valid) {
+        if (result.message === '등호가 필요합니다.') {
+          return '';
+        }
         return result.message;
       }
       if (!result.isCorrect) {

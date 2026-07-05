@@ -16,7 +16,6 @@ export default function InlineOperatorMenu({
   onClose,
   ariaLabelPrefix = '연산자 선택',
 }: InlineOperatorMenuProps) {
-  const [placement, setPlacement] = useState<'top' | 'bottom'>('top');
   const [horizontalOffset, setHorizontalOffset] = useState(0);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -27,12 +26,6 @@ export default function InlineOperatorMenu({
 
     const rect = popoverRef.current.getBoundingClientRect();
     const viewportPadding = 12;
-
-    if (rect.top < 60) {
-      setPlacement('bottom');
-    } else {
-      setPlacement('top');
-    }
 
     if (rect.left < viewportPadding) {
       setHorizontalOffset(viewportPadding - rect.left);
@@ -57,11 +50,7 @@ export default function InlineOperatorMenu({
       {/* Popover Menu */}
       <div
         ref={popoverRef}
-        className={`absolute left-1/2 z-50 flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white p-1.5 shadow-lg pointer-events-auto ${
-          placement === 'top' 
-            ? 'bottom-full mb-3 origin-bottom' 
-            : 'top-full mt-3 origin-top'
-        }`}
+        className="absolute left-1/2 top-full z-50 mt-3 flex origin-top items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white p-1.5 shadow-lg pointer-events-auto"
         style={{
           transform: `translateX(calc(-50% + ${horizontalOffset}px))`,
         }}
