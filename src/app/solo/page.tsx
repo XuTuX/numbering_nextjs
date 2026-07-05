@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import SoloGameHeader from '@/components/SoloGameHeader';
 import NumberingEditor from '@/components/NumberingEditor';
-import ExpressionPreview from '@/components/ExpressionPreview';
+
 import DifficultySelector from '@/components/DifficultySelector';
 import PuzzleResultModal from '@/components/PuzzleResultModal';
 import BottomGameActions from '@/components/BottomGameActions';
@@ -351,14 +351,16 @@ export default function SoloGamePage() {
                 onSelectSlot={handleSelectSlot}
               />
 
-              {/* Unified Equation Preview */}
-              <ExpressionPreview
-                digits={gameState.digits}
-                operatorSlots={gameState.operatorSlots}
-                parentheses={gameState.parentheses}
-                status={gameState.status}
-                warningMessage={displayMessage}
-              />
+              {/* 
+                Unified Equation Preview was removed per user request.
+                If any validation messages exist, they could still be shown, 
+                but for now we omit the entire block to keep the UI clean.
+              */}
+              {displayMessage && (
+                <div className="mt-4 min-h-[24px] text-center text-sm font-medium text-red-500">
+                  {displayMessage}
+                </div>
+              )}
 
               <div className="mb-4 flex min-h-[96px] items-center justify-center">
                 {selectedSlotIndex !== null && (

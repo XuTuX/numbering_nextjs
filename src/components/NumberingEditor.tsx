@@ -139,7 +139,7 @@ export default function NumberingEditor({
                       e.stopPropagation();
                       onSelectSlot(index);
                     }}
-                    className="absolute inset-y-[-0.2em] left-1/2 flex min-h-[44px] min-w-[44px] w-[1.5em] -translate-x-1/2 items-center justify-center rounded-full outline-none"
+                    className="absolute top-1/2 left-1/2 flex min-h-[44px] min-w-[44px] w-[1.5em] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full outline-none"
                     aria-label={`${digits[index]}와 ${digits[index + 1]} 사이 ${
                       slotOperator ? `${slotOperator} 연산자 수정` : '연산자 삽입'
                     }`}
