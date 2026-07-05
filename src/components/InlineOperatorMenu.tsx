@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { InlineOperator } from '@/types/game';
-import { PuzzleDifficulty } from '@/lib/puzzleTypes';
 
 interface InlineOperatorMenuProps {
-  difficulty: PuzzleDifficulty;
   currentOperator: InlineOperator | null;
   onSelect: (op: InlineOperator | null) => void;
   onClose: () => void;
@@ -13,29 +11,35 @@ interface InlineOperatorMenuProps {
 }
 
 export default function InlineOperatorMenu({
-  difficulty,
   currentOperator,
   onSelect,
   onClose,
   ariaLabelPrefix = '연산자 선택',
 }: InlineOperatorMenuProps) {
   const [placement, setPlacement] = useState<'top' | 'bottom'>('top');
+  const [horizontalOffset, setHorizontalOffset] = useState(0);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  const easyOperators: InlineOperator[] = ['+', '-', '='];
-  const normalOperators: InlineOperator[] = ['+', '-', '×', '÷', '='];
-  
-  const operators = difficulty === 'EASY' ? easyOperators : normalOperators;
+  const operators: InlineOperator[] = ['+', '-', '×', '÷', '='];
 
   useEffect(() => {
     if (!popoverRef.current) return;
-    
-    // Check if the popover overflows the top of the viewport
+
     const rect = popoverRef.current.getBoundingClientRect();
+    const viewportPadding = 12;
+
     if (rect.top < 60) {
       setPlacement('bottom');
     } else {
       setPlacement('top');
+    }
+
+    if (rect.left < viewportPadding) {
+      setHorizontalOffset(viewportPadding - rect.left);
+    } else if (rect.right > window.innerWidth - viewportPadding) {
+      setHorizontalOffset(window.innerWidth - viewportPadding - rect.right);
+    } else {
+      setHorizontalOffset(0);
     }
   }, []);
 
@@ -53,14 +57,17 @@ export default function InlineOperatorMenu({
       {/* Popover Menu */}
       <div
         ref={popoverRef}
-        className={`absolute left-1/2 z-50 flex items-center gap-1.5 p-1.5 bg-white border border-[#E5E7EB] rounded-2xl shadow-lg pointer-events-auto transition-transform ${
+        className={`absolute left-1/2 z-50 flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white p-1.5 shadow-lg pointer-events-auto ${
           placement === 'top' 
-            ? 'bottom-full mb-3 origin-bottom -translate-x-1/2 animate-popover-top' 
-            : 'top-full mt-3 origin-top -translate-x-1/2 animate-popover-bottom'
+            ? 'bottom-full mb-3 origin-bottom' 
+            : 'top-full mt-3 origin-top'
         }`}
+        style={{
+          transform: `translateX(calc(-50% + ${horizontalOffset}px))`,
+        }}
         role="dialog"
         aria-label={ariaLabelPrefix}
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the menu itself
+        onClick={(e) => e.stopPropagation()}
       >
         {operators.map((op) => {
           const isSelected = currentOperator === op;

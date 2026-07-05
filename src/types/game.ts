@@ -32,7 +32,6 @@ export type NumberRangeSelection = {
 
 export type InlineMenuState = {
   openSlotIndex: number | null;
-  editingSlotIndex: number | null;
 };
 
 export type SoloEditorState = {

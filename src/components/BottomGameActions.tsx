@@ -26,30 +26,28 @@ export default function BottomGameActions({
   const isHard = difficulty === 'HARD';
 
   return (
-    <div className="w-full max-w-lg mx-auto px-2 mt-6">
-      <div className="flex justify-between items-center gap-3">
-        {/* Hint Button */}
+    <div className="mx-auto mt-6 w-full max-w-lg px-2">
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
         <button
           onClick={onHintClick}
           disabled={hintCount <= 0}
-          className={`flex-1 py-4 rounded-2xl text-sm font-medium transition-all shadow-sm border ${
+          className={`h-12 flex-1 rounded-lg border text-sm font-medium transition-all ${
             hintCount > 0
-              ? 'text-gray-500 bg-white border-gray-200 hover:bg-gray-50 cursor-pointer active:scale-95'
-              : 'text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed'
+              ? 'cursor-pointer border-gray-200 bg-white text-gray-700 hover:bg-gray-50 active:scale-95'
+              : 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
           }`}
         >
-          힌트 {hintCount}
+          힌트
         </button>
 
-        {/* Parentheses Button - Hard Mode Only */}
         {isHard && onWrapParentheses && (
           <button
             onClick={onWrapParentheses}
             disabled={!hasSelectedRange}
-            className={`flex-1 py-4 rounded-2xl text-sm font-medium transition-all shadow-sm border flex items-center justify-center gap-1 ${
+            className={`flex h-12 flex-1 items-center justify-center gap-1 rounded-lg border text-sm font-medium transition-all ${
               hasSelectedRange
-                ? 'text-black bg-white border-gray-200 hover:bg-gray-50 cursor-pointer active:scale-95'
-                : 'text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed'
+                ? 'cursor-pointer border-gray-200 bg-white text-black hover:bg-gray-50 active:scale-95'
+                : 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
             }`}
             aria-label="괄호로 묶기"
           >
@@ -57,19 +55,17 @@ export default function BottomGameActions({
           </button>
         )}
 
-        {/* Reset Button */}
         <button
           onClick={onResetClick}
-          className="flex-1 py-4 rounded-2xl text-sm font-medium text-gray-500 bg-white border border-gray-200 hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+          className="h-12 flex-1 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 active:scale-95"
         >
           초기화
         </button>
 
-        {/* Submit Button */}
         <button
           onClick={onSubmitClick}
           disabled={!isSubmitEnabled}
-          className={`px-8 py-4 rounded-2xl text-base font-semibold transition-all shadow-sm ${
+          className={`h-12 rounded-lg px-7 text-base font-semibold transition-all ${
             isHard ? 'flex-[1.2]' : 'flex-[1.5]'
           } ${
             isSubmitEnabled

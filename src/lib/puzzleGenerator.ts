@@ -170,7 +170,6 @@ function generateHard(): { expr: string; digits: string } | null {
     () => { // A × (B + C) ÷ D = E
       const A = getRandomInt(2, 20);
       const D = getRandomInt(2, 20);
-      const E = getRandomInt(2, 50);
       // Ensure A * (B + C) = D * E
       // and A * (B + C) is divisible by D -> easiest is pick B+C such that it cancels out
       // Just pick (B+C) randomly such that A * (B+C) % D === 0

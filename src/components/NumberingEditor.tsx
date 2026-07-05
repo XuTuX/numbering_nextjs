@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { OperatorSlot, ParenthesisRange, NumberRangeSelection, InlineMenuState, InlineOperator } from '@/types/game';
+import {
+  InlineMenuState,
+  InlineOperator,
+  NumberRangeSelection,
+  OperatorSlot,
+  ParenthesisRange,
+} from '@/types/game';
 import { PuzzleDifficulty } from '@/lib/puzzleTypes';
 import InlineOperatorMenu from './InlineOperatorMenu';
 
@@ -38,200 +44,209 @@ export default function NumberingEditor({
 
   const isHard = difficulty === 'HARD';
 
-  // Find selection range limits (ordered)
-  const getSelectionRange = () => {
-    const { startDigitIndex, endDigitIndex } = selectedRange;
-    if (startDigitIndex === null) return { start: null, end: null };
-    if (endDigitIndex === null) return { start: startDigitIndex, end: startDigitIndex };
-    return {
-      start: Math.min(startDigitIndex, endDigitIndex),
-      end: Math.max(startDigitIndex, endDigitIndex),
-    };
+  const selectedStart =
+    selectedRange.startDigitIndex === null
+      ? null
+      : Math.min(
+          selectedRange.startDigitIndex,
+          selectedRange.endDigitIndex ?? selectedRange.startDigitIndex
+        );
+  const selectedEnd =
+    selectedRange.startDigitIndex === null
+      ? null
+      : Math.max(
+          selectedRange.startDigitIndex,
+          selectedRange.endDigitIndex ?? selectedRange.startDigitIndex
+        );
+
+  const getSlotOperator = (index: number) =>
+    operatorSlots.find((slot) => slot.index === index)?.operator ?? null;
+
+  const getContainingParenthesis = (index: number) => {
+    return [...parentheses]
+      .filter((range) => range.startDigitIndex <= index && index <= range.endDigitIndex)
+      .sort((a, b) => a.endDigitIndex - a.startDigitIndex - (b.endDigitIndex - b.startDigitIndex))[0];
   };
 
-  const { start: selectStart, end: selectEnd } = getSelectionRange();
-
-  const isDigitSelected = (index: number) => {
-    if (selectStart === null) return false;
-    return index >= selectStart && index <= (selectEnd ?? selectStart);
-  };
+  const renderParenthesisMenu = (range: ParenthesisRange) => (
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-transparent"
+        onClick={(event) => {
+          event.stopPropagation();
+          setActiveParenthesisMenuId(null);
+        }}
+      />
+      <div
+        className="absolute left-1/2 top-full z-50 mt-3 -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-1 shadow-lg"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-label="괄호 범위 메뉴"
+      >
+        <button
+          onClick={() => {
+            onDeleteParenthesis(range.id);
+            setActiveParenthesisMenuId(null);
+          }}
+          className="h-9 rounded-md px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 active:scale-95"
+        >
+          괄호 해제
+        </button>
+      </div>
+    </>
+  );
 
   return (
-    <div className="w-full overflow-x-auto flex justify-start md:justify-center items-center py-12 px-6 scrollbar-none">
-      <div className="flex items-center flex-nowrap shrink-0 gap-0">
-        {digits.map((digit, i) => {
-          // Find if there is an opening parenthesis that starts at this digit
-          const openParens = parentheses.filter((p) => p.startDigitIndex === i);
-          // Find if there is a closing parenthesis that ends at this digit
-          const closeParens = parentheses.filter((p) => p.endDigitIndex === i);
+    <div className="w-full overflow-x-auto px-3 py-12 md:px-6 md:py-16">
+      <div className="mx-auto flex w-max min-w-full items-center justify-start md:justify-center">
+        <div
+          className="flex items-center whitespace-nowrap text-[3.5rem] font-semibold leading-none tracking-normal text-[#111111] md:text-[5.5rem]"
+          aria-label="수식 편집 영역"
+        >
+          {digits.map((digit, index) => {
+            const opens = parentheses.filter((range) => range.startDigitIndex === index);
+            const closes = parentheses.filter((range) => range.endDigitIndex === index);
+            const containingParenthesis = getContainingParenthesis(index);
+            const isParenthesisMenuOpen =
+              containingParenthesis !== undefined &&
+              activeParenthesisMenuId === containingParenthesis.id;
+            const isSelected =
+              selectedStart !== null &&
+              selectedEnd !== null &&
+              selectedStart <= index &&
+              index <= selectedEnd;
+            const isSelectionStartOnly =
+              selectedRange.startDigitIndex === index && selectedRange.endDigitIndex === null;
+            const slotOperator = index < digits.length - 1 ? getSlotOperator(index) : null;
+            const isSlotOpen = inlineMenu.openSlotIndex === index;
+            const isChanged = lastChangedSlotIndex === index;
 
-          const isSelected = isDigitSelected(i);
-          const isSelectionStart = selectedRange.startDigitIndex === i;
-
-          return (
-            <React.Fragment key={`digit-group-${i}`}>
-              {/* 1. Opening Parentheses */}
-              {openParens.map((paren) => (
-                <span
-                  key={`open-${paren.id}`}
-                  className="relative inline-block"
-                >
+            return (
+              <React.Fragment key={`digit-${index}`}>
+                {opens.map((range) => (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    key={`open-${range.id}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
                       setActiveParenthesisMenuId(
-                        activeParenthesisMenuId === paren.id ? null : paren.id
+                        activeParenthesisMenuId === range.id ? null : range.id
                       );
                     }}
-                    className="text-5xl md:text-7xl font-light text-gray-300 hover:text-red-500 transition-colors px-1 cursor-pointer select-none"
-                    aria-label="여는 괄호, 클릭하여 제거 메뉴 열기"
+                    className="relative -mr-1 px-0.5 text-[0.85em] font-medium text-[#333333] transition-colors hover:text-black"
+                    aria-label="여는 괄호, 괄호 해제 메뉴 열기"
                   >
                     (
                   </button>
-                  {activeParenthesisMenuId === paren.id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40 bg-transparent"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveParenthesisMenuId(null);
-                        }}
-                      />
-                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-lg animate-popover-top flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            onDeleteParenthesis(paren.id);
-                            setActiveParenthesisMenuId(null);
-                          }}
-                          className="text-xs font-semibold text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-100 transition-colors whitespace-nowrap active:scale-95"
-                        >
-                          괄호 제거
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </span>
-              ))}
+                ))}
 
-              {/* 2. The Digit Card/Text */}
-              <span className="relative inline-block">
-                <button
-                  disabled={!isHard}
-                  onClick={() => onDigitClick(i)}
-                  className={`text-5xl md:text-7xl font-semibold select-none transition-all outline-none pb-1 ${
-                    isHard
-                      ? 'cursor-pointer hover:opacity-80 active:scale-95'
-                      : 'cursor-default text-black'
-                  } ${
-                    isSelected
-                      ? 'text-black border-b-4 border-black/80'
-                      : isSelectionStart
-                      ? 'text-black border-b-4 border-black/30'
-                      : 'text-black border-b-4 border-transparent'
-                  }`}
-                  aria-label={
-                    isHard
-                      ? `숫자 ${digit}, 범위 선택하려면 누르세요. 현재 ${
-                          isSelected ? '선택됨' : '선택되지 않음'
-                        }`
-                      : `숫자 ${digit}`
-                  }
-                >
-                  {digit}
-                </button>
-              </span>
-
-              {/* 3. Closing Parentheses */}
-              {closeParens.map((paren) => (
-                <span
-                  key={`close-${paren.id}`}
-                  className="relative inline-block"
-                >
+                <span className="relative inline-flex items-center">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    aria-disabled={!isHard}
+                    tabIndex={isHard ? 0 : -1}
+                    onClick={() => {
+                      if (!isHard) return;
+                      if (containingParenthesis) {
+                        setActiveParenthesisMenuId(
+                          activeParenthesisMenuId === containingParenthesis.id
+                            ? null
+                            : containingParenthesis.id
+                        );
+                        return;
+                      }
+                      setActiveParenthesisMenuId(null);
+                      onDigitClick(index);
+                    }}
+                    className={`relative flex h-[1.25em] min-w-[0.62em] items-center justify-center rounded-md px-0.5 outline-none transition-colors ${
+                      isHard
+                        ? 'cursor-pointer hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-gray-300'
+                        : 'cursor-default'
+                    } ${
+                      isSelected
+                        ? 'bg-gray-200/60'
+                        : isSelectionStartOnly
+                        ? 'bg-gray-100'
+                        : 'bg-transparent'
+                    }`}
+                    aria-label={
+                      isHard
+                        ? `숫자 ${digit}, 괄호 범위 선택 ${isSelected ? '선택됨' : '가능'}`
+                        : `숫자 ${digit}`
+                    }
+                  >
+                    {digit}
+                    {(isSelected || isSelectionStartOnly) && (
+                      <span className="absolute bottom-0 left-1 right-1 h-0.5 rounded-full bg-black/35" />
+                    )}
+                  </button>
+
+                  {isParenthesisMenuOpen &&
+                    containingParenthesis &&
+                    renderParenthesisMenu(containingParenthesis)}
+                </span>
+
+                {closes.map((range) => (
+                  <button
+                    key={`close-${range.id}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
                       setActiveParenthesisMenuId(
-                        activeParenthesisMenuId === paren.id ? null : paren.id
+                        activeParenthesisMenuId === range.id ? null : range.id
                       );
                     }}
-                    className="text-5xl md:text-7xl font-light text-gray-300 hover:text-red-500 transition-colors px-1 cursor-pointer select-none"
-                    aria-label="닫는 괄호, 클릭하여 제거 메뉴 열기"
+                    className="relative -ml-1 px-0.5 text-[0.85em] font-medium text-[#333333] transition-colors hover:text-black"
+                    aria-label="닫는 괄호, 괄호 해제 메뉴 열기"
                   >
                     )
                   </button>
-                  {activeParenthesisMenuId === paren.id && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40 bg-transparent"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveParenthesisMenuId(null);
-                        }}
-                      />
-                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-lg animate-popover-top flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            onDeleteParenthesis(paren.id);
-                            setActiveParenthesisMenuId(null);
-                          }}
-                          className="text-xs font-semibold text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-100 transition-colors whitespace-nowrap active:scale-95"
-                        >
-                          괄호 제거
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </span>
-              ))}
+                ))}
 
-              {/* 4. Operator Slot between digits */}
-              {i < digits.length - 1 && (() => {
-                const slot = operatorSlots.find((s) => s.index === i);
-                const op = slot?.operator || null;
-                const isMenuOpen = inlineMenu.openSlotIndex === i || inlineMenu.editingSlotIndex === i;
-                const hasBump = lastChangedSlotIndex === i;
-
-                return (
-                  <div
-                    key={`slot-${i}`}
-                    className="relative flex items-center justify-center min-w-[2.5rem] md:min-w-[3.5rem] h-16 md:h-24 mx-1"
+                {index < digits.length - 1 && (
+                  <span
+                    className={`relative inline-flex h-[1.25em] items-center justify-center align-middle transition-[width] duration-150 ${
+                      slotOperator || isSlotOpen
+                        ? 'w-[0.88em] md:w-[0.95em]'
+                        : 'w-[0.42em] md:w-[0.5em]'
+                    }`}
                   >
                     <button
-                      onClick={() => onOpenMenu(i)}
-                      className={`w-full h-full flex items-center justify-center rounded-xl transition-all outline-none focus:ring-2 focus:ring-gray-200 ${
-                        op
-                          ? 'text-4xl md:text-6xl text-gray-800 font-medium hover:opacity-80 active:scale-95'
-                          : 'hover:bg-gray-100/30'
+                      onClick={() => {
+                        setActiveParenthesisMenuId(null);
+                        onOpenMenu(index);
+                      }}
+                      className="absolute inset-y-[-0.18em] left-1/2 flex min-h-12 w-12 -translate-x-1/2 items-center justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-gray-300"
+                      aria-label={`${digits[index]}와 ${digits[index + 1]} 사이 ${
+                        slotOperator ? `${slotOperator} 연산자 수정` : '연산자 삽입'
                       }`}
-                      aria-label={`${digits[i]}와(과) ${digits[i + 1]} 사이 연산자 ${
-                        op ? `'${op}'` : '비어있음'
-                      }, 기호 삽입하려면 클릭`}
                     >
-                      {op ? (
-                        <span className={hasBump ? 'animate-bump' : ''}>
-                          {op}
+                      {slotOperator ? (
+                        <span
+                          className={`text-[0.74em] font-medium leading-none text-[#222222] ${
+                            isChanged ? 'animate-bump' : ''
+                          }`}
+                        >
+                          {slotOperator}
                         </span>
                       ) : (
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-200 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity" />
+                        isSlotOpen && (
+                          <span className="h-[0.86em] w-px rounded-full bg-black/70" />
+                        )
                       )}
                     </button>
 
-                    {/* Inline Popover Menu */}
-                    {isMenuOpen && (
+                    {isSlotOpen && (
                       <InlineOperatorMenu
-                        difficulty={difficulty}
-                        currentOperator={op}
-                        onSelect={(newOp) => onSelectOperator(i, newOp)}
+                        currentOperator={slotOperator}
+                        onSelect={(newOperator) => onSelectOperator(index, newOperator)}
                         onClose={onCloseMenu}
-                        ariaLabelPrefix={`${digits[i]}와(과) ${digits[i + 1]} 사이 연산자 선택`}
+                        ariaLabelPrefix={`${digits[index]}와 ${digits[index + 1]} 사이 연산자 선택`}
                       />
                     )}
-                  </div>
-                );
-              })()}
-            </React.Fragment>
-          );
-        })}
+                  </span>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

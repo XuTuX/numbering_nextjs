@@ -21,10 +21,9 @@ export default function ExpressionPreview({
   const expression = buildExpression(digits, operatorSlots, parentheses);
 
   return (
-    <div className="w-full max-w-lg mx-auto bg-white border border-[#EAEAEA] rounded-2xl p-6 flex flex-col items-center justify-center min-h-[7rem] shadow-sm mb-6 transition-all duration-300">
-      {/* Complete Equation Text */}
+    <div className="mx-auto mb-6 flex min-h-24 w-full max-w-lg flex-col items-center justify-center rounded-lg border border-[#EAEAEA] bg-white px-5 py-4 transition-all duration-300">
       <div
-        className={`text-2xl md:text-3xl font-medium tracking-wide text-center transition-colors break-all leading-relaxed ${
+        className={`break-all text-center text-2xl font-medium leading-relaxed tracking-normal transition-colors md:text-3xl ${
           status === 'correct'
             ? 'text-[#28A745]'
             : status === 'wrong'
@@ -35,16 +34,13 @@ export default function ExpressionPreview({
         {expression || ' '}
       </div>
 
-      {/* Dynamic Status / Hint Message */}
-      <div className="min-h-[1.25rem] mt-2 flex items-center justify-center">
+      <div className="mt-2 flex min-h-[1.25rem] items-center justify-center">
         {warningMessage && status === 'playing' ? (
-          <span className="text-xs md:text-sm text-[#E58A00] font-medium text-center animate-in fade-in zoom-in-95 duration-200">
+          <span className="animate-in fade-in zoom-in-95 text-center text-xs font-medium text-[#9A6A00] duration-200 md:text-sm">
             {warningMessage}
           </span>
         ) : (
-          <span className="text-xs text-[#A0A0A0] text-center font-normal">
-            {status === 'playing' ? '숫자 사이를 클릭하여 연산자를 삽입하세요.' : ' '}
-          </span>
+          <span className="text-xs text-transparent">.</span>
         )}
       </div>
     </div>

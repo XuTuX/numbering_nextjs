@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import SoloGameHeader from '@/components/SoloGameHeader';
 import NumberingEditor from '@/components/NumberingEditor';
 import ExpressionPreview from '@/components/ExpressionPreview';
 import DifficultySelector from '@/components/DifficultySelector';
 import PuzzleResultModal from '@/components/PuzzleResultModal';
-import RangeSelectionToolbar from '@/components/RangeSelectionToolbar';
 import BottomGameActions from '@/components/BottomGameActions';
 
 import { SoloGameState, PuzzleDifficulty } from '@/lib/puzzleTypes';
@@ -22,7 +21,7 @@ export default function SoloGamePage() {
     operatorSlots: [],
     parentheses: [],
     selectedRange: { startDigitIndex: null, endDigitIndex: null },
-    inlineMenu: { openSlotIndex: null, editingSlotIndex: null },
+    inlineMenu: { openSlotIndex: null },
     hintCount: 3,
     startedAt: 0,
     status: 'idle',
@@ -62,7 +61,7 @@ export default function SoloGamePage() {
       operatorSlots,
       parentheses: [],
       selectedRange: { startDigitIndex: null, endDigitIndex: null },
-      inlineMenu: { openSlotIndex: null, editingSlotIndex: null },
+      inlineMenu: { openSlotIndex: null },
       hintCount: 3,
       startedAt: Date.now(),
       status: 'playing',
@@ -76,6 +75,7 @@ export default function SoloGamePage() {
   // Hard mode: Handle range selection by tapping digits
   const handleDigitClick = (index: number) => {
     if (gameState.status !== 'playing' || gameState.difficulty !== 'HARD') return;
+    setWarningMessage('');
 
     setGameState(prev => {
       const { startDigitIndex, endDigitIndex } = prev.selectedRange;
@@ -85,6 +85,7 @@ export default function SoloGamePage() {
         return {
           ...prev,
           selectedRange: { startDigitIndex: index, endDigitIndex: null },
+          inlineMenu: { openSlotIndex: null },
         };
       }
 
@@ -93,6 +94,7 @@ export default function SoloGamePage() {
         return {
           ...prev,
           selectedRange: { startDigitIndex: null, endDigitIndex: null },
+          inlineMenu: { openSlotIndex: null },
         };
       }
 
@@ -101,6 +103,7 @@ export default function SoloGamePage() {
         return {
           ...prev,
           selectedRange: { startDigitIndex, endDigitIndex: index },
+          inlineMenu: { openSlotIndex: null },
         };
       }
 
@@ -108,6 +111,7 @@ export default function SoloGamePage() {
       return {
         ...prev,
         selectedRange: { startDigitIndex: index, endDigitIndex: null },
+        inlineMenu: { openSlotIndex: null },
       };
     });
   };
@@ -127,7 +131,7 @@ export default function SoloGamePage() {
       p => p.startDigitIndex === start && p.endDigitIndex === end
     );
     if (exactDuplicate) {
-      setWarningMessage('💡 이미 동일한 범위가 괄호로 묶여 있습니다.');
+      setWarningMessage('이미 동일한 범위가 괄호로 묶여 있습니다.');
       return;
     }
 
@@ -140,7 +144,7 @@ export default function SoloGamePage() {
     });
 
     if (crossing) {
-      setWarningMessage('💡 괄호 범위가 서로 교차할 수 없습니다.');
+      setWarningMessage('괄호 범위가 서로 교차할 수 없습니다.');
       return;
     }
 
@@ -155,42 +159,43 @@ export default function SoloGamePage() {
         ...prev,
         parentheses: [...prev.parentheses, newParenthesis],
         selectedRange: { startDigitIndex: null, endDigitIndex: null },
+        inlineMenu: { openSlotIndex: null },
       };
     });
     setWarningMessage('');
-  };
-
-  const handleClearSelection = () => {
-    setGameState(prev => ({
-      ...prev,
-      selectedRange: { startDigitIndex: null, endDigitIndex: null },
-    }));
   };
 
   const handleDeleteParenthesis = (id: string) => {
     setGameState(prev => ({
       ...prev,
       parentheses: prev.parentheses.filter(p => p.id !== id),
+      selectedRange: { startDigitIndex: null, endDigitIndex: null },
     }));
+    setWarningMessage('');
   };
 
   const handleOpenMenu = (index: number) => {
     if (gameState.status !== 'playing') return;
+    setWarningMessage('');
     setGameState(prev => ({
       ...prev,
-      inlineMenu: { openSlotIndex: index, editingSlotIndex: index },
+      inlineMenu: {
+        openSlotIndex: prev.inlineMenu.openSlotIndex === index ? null : index,
+      },
+      selectedRange: { startDigitIndex: null, endDigitIndex: null },
     }));
   };
 
   const handleCloseMenu = () => {
     setGameState(prev => ({
       ...prev,
-      inlineMenu: { openSlotIndex: null, editingSlotIndex: null },
+      inlineMenu: { openSlotIndex: null },
     }));
   };
 
   const handleSelectOperator = (index: number, op: InlineOperator | null) => {
     if (gameState.status !== 'playing') return;
+    setWarningMessage('');
     setGameState(prev => {
       const newSlots = prev.operatorSlots.map(s => {
         if (s.index === index) {
@@ -202,6 +207,7 @@ export default function SoloGamePage() {
       return {
         ...prev,
         operatorSlots: newSlots,
+        inlineMenu: { openSlotIndex: null },
       };
     });
 
@@ -218,7 +224,7 @@ export default function SoloGamePage() {
       operatorSlots: prev.operatorSlots.map(s => ({ ...s, operator: null })),
       parentheses: [],
       selectedRange: { startDigitIndex: null, endDigitIndex: null },
-      inlineMenu: { openSlotIndex: null, editingSlotIndex: null },
+      inlineMenu: { openSlotIndex: null },
     }));
     setLastChangedSlotIndex(null);
     setWarningMessage('');
@@ -230,22 +236,22 @@ export default function SoloGamePage() {
     gameState.parentheses
   );
 
-  useEffect(() => {
+  const validationMessage = useMemo(() => {
     if (gameState.status === 'playing' && gameState.puzzle) {
       if (!currentExpression) {
-        setWarningMessage('');
-        return;
+        return '';
       }
 
       const result = validateEquation(currentExpression, gameState.puzzle.digitString);
       if (!result.valid) {
-        setWarningMessage(result.message);
-      } else if (!result.isCorrect) {
-        setWarningMessage('좌변과 우변의 값이 다릅니다.');
-      } else {
-        setWarningMessage('');
+        return result.message;
       }
+      if (!result.isCorrect) {
+        return '좌변과 우변의 값이 다릅니다.';
+      }
+      return '';
     }
+    return '';
   }, [currentExpression, gameState.status, gameState.puzzle]);
 
   const handleSubmit = () => {
@@ -269,21 +275,18 @@ export default function SoloGamePage() {
       const hints = [
         `이 문제에는 '${gameState.puzzle.usedOperators[Math.floor(Math.random() * gameState.puzzle.usedOperators.length)]}' 기호가 포함됩니다.`,
         gameState.puzzle.usedOperators.includes('(') ? '이 문제에는 괄호가 필요합니다.' : '이 문제에는 괄호가 필요하지 않습니다.',
-        `결과값은 ${gameState.puzzle.answerExpression.split('=')[1].trim()} 일수도 있습니다 (힌트!)`,
+        `결과값은 ${gameState.puzzle.answerExpression.split('=')[1].trim()} 입니다.`,
       ];
       const randomHint = hints[Math.floor(Math.random() * hints.length)];
-      setWarningMessage(`💡 힌트: ${randomHint}`);
+      setWarningMessage(`힌트: ${randomHint}`);
     }
   };
 
   const isSubmitEnabled = gameState.status === 'playing' && currentExpression.includes('=');
+  const displayMessage = warningMessage || validationMessage;
   const hasSelectedRange =
     gameState.selectedRange.startDigitIndex !== null &&
     gameState.selectedRange.endDigitIndex !== null;
-  const isSelectionActive =
-    gameState.selectedRange.startDigitIndex !== null ||
-    gameState.selectedRange.endDigitIndex !== null;
-
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col items-center px-4 md:px-8 py-8 md:py-12 selection:bg-gray-200 font-sans">
       <div className="w-full max-w-3xl flex flex-col flex-grow">
@@ -314,23 +317,13 @@ export default function SoloGamePage() {
                 onDeleteParenthesis={handleDeleteParenthesis}
               />
 
-              {/* Range selection indicator toolbar (Hard Mode Only) */}
-              {gameState.difficulty === 'HARD' && (
-                <RangeSelectionToolbar
-                  selectedRange={gameState.selectedRange}
-                  onWrapParentheses={handleWrapParentheses}
-                  onClearSelection={handleClearSelection}
-                  isSelectionActive={isSelectionActive}
-                />
-              )}
-
               {/* Unified Equation Preview */}
               <ExpressionPreview
                 digits={gameState.digits}
                 operatorSlots={gameState.operatorSlots}
                 parentheses={gameState.parentheses}
                 status={gameState.status}
-                warningMessage={warningMessage}
+                warningMessage={displayMessage}
               />
 
               {/* Bottom Gameplay Actions */}
