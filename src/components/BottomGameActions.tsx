@@ -9,10 +9,6 @@ interface BottomGameActionsProps {
   onHintClick: () => void;
   onResetClick: () => void;
   onSubmitClick: () => void;
-  onWrapParentheses?: () => void;
-  onUnwrapParentheses?: () => void;
-  hasSelectedRange?: boolean;
-  selectedParenthesisId?: string | null;
 }
 
 export default function BottomGameActions({
@@ -22,10 +18,6 @@ export default function BottomGameActions({
   onHintClick,
   onResetClick,
   onSubmitClick,
-  onWrapParentheses,
-  onUnwrapParentheses,
-  hasSelectedRange = false,
-  selectedParenthesisId = null,
 }: BottomGameActionsProps) {
   const isHard = difficulty === 'HARD';
 
@@ -47,30 +39,7 @@ export default function BottomGameActions({
           힌트
         </button>
 
-        {onWrapParentheses && (
-          selectedParenthesisId ? (
-            <button
-              onClick={onUnwrapParentheses}
-              className="flex h-12 flex-1 items-center justify-center gap-1 rounded-lg border border-red-200 bg-red-50 text-sm font-medium text-red-600 transition-all hover:bg-red-100 active:scale-95 cursor-pointer"
-              aria-label="괄호 해제"
-            >
-              괄호 해제
-            </button>
-          ) : (
-            <button
-              onClick={onWrapParentheses}
-              disabled={!hasSelectedRange}
-              className={`flex h-12 flex-1 items-center justify-center gap-1 rounded-lg border text-sm font-medium transition-all ${
-                hasSelectedRange
-                  ? 'cursor-pointer border-gray-200 bg-white text-black hover:bg-gray-50 active:scale-95'
-                  : 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
-              }`}
-              aria-label="괄호로 묶기"
-            >
-              <span className="font-bold">( )</span> 묶기
-            </button>
-          )
-        )}
+
 
         <button
           onClick={onResetClick}

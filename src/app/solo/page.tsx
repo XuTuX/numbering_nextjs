@@ -373,6 +373,33 @@ export default function SoloGamePage() {
                     }
                   />
                 )}
+
+                {hasSelectedRange && (selEnd! - selStart! >= 2 || selectedParenthesisId) && (
+                  <div className="w-full max-w-lg mx-auto flex flex-col items-center justify-center gap-2 p-2 animate-in fade-in zoom-in duration-200">
+                    <div className="text-xs font-medium text-gray-500">
+                      {selectedParenthesisId ? '선택한 범위의 괄호를 해제할 수 있습니다.' : '선택한 범위를 괄호로 묶을 수 있습니다.'}
+                    </div>
+                    <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm">
+                      {selectedParenthesisId ? (
+                        <button
+                          onClick={() => handleDeleteParenthesis(selectedParenthesisId)}
+                          className="px-8 h-12 flex items-center justify-center rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
+                        >
+                          삭제
+                        </button>
+                      ) : (
+                        selEnd! - selStart! >= 2 && (
+                          <button
+                            onClick={handleWrapParentheses}
+                            className="px-8 h-12 flex items-center justify-center rounded-xl text-sm font-semibold bg-[#111111] text-white hover:scale-[1.02] active:scale-95 transition-all"
+                          >
+                            ( ) 묶기
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Bottom Gameplay Actions */}
@@ -383,12 +410,6 @@ export default function SoloGamePage() {
                 onHintClick={handleHintClick}
                 onResetClick={handleResetClick}
                 onSubmitClick={handleSubmit}
-                onWrapParentheses={handleWrapParentheses}
-                onUnwrapParentheses={() => {
-                  if (selectedParenthesisId) handleDeleteParenthesis(selectedParenthesisId);
-                }}
-                hasSelectedRange={hasSelectedRange}
-                selectedParenthesisId={selectedParenthesisId}
               />
             </>
           )}
