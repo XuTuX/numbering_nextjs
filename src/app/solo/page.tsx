@@ -183,14 +183,6 @@ export default function SoloGamePage() {
       inlineMenu: {
         openSlotIndex: prev.inlineMenu.openSlotIndex === index ? null : index,
       },
-      selectedRange: { startDigitIndex: null, endDigitIndex: null },
-    }));
-  };
-
-  const handleCloseMenu = () => {
-    setGameState(prev => ({
-      ...prev,
-      inlineMenu: { openSlotIndex: null },
     }));
   };
 
@@ -327,6 +319,7 @@ export default function SoloGamePage() {
                 operatorSlots={gameState.operatorSlots}
                 parentheses={gameState.parentheses}
                 selectedRange={gameState.selectedRange}
+                activeSlotIndex={gameState.inlineMenu.openSlotIndex}
                 lastChangedSlotIndex={lastChangedSlotIndex}
                 onDigitClick={handleDigitClick}
                 onOpenMenu={handleOpenMenu}

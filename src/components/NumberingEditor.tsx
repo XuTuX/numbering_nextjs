@@ -14,6 +14,7 @@ interface NumberingEditorProps {
   operatorSlots: OperatorSlot[];
   parentheses: ParenthesisRange[];
   selectedRange: NumberRangeSelection;
+  activeSlotIndex: number | null;
   lastChangedSlotIndex: number | null;
   onDigitClick: (index: number) => void;
   onOpenMenu: (index: number) => void;
@@ -25,6 +26,7 @@ export default function NumberingEditor({
   operatorSlots,
   parentheses,
   selectedRange,
+  activeSlotIndex,
   lastChangedSlotIndex,
   onDigitClick,
   onOpenMenu,
@@ -75,6 +77,7 @@ export default function NumberingEditor({
           const isSelectionStartOnly =
             selectedRange.startDigitIndex === index && selectedRange.endDigitIndex === null;
           const slotOperator = index < digits.length - 1 ? getSlotOperator(index) : null;
+          const isActiveSlot = activeSlotIndex === index;
           const isChanged = lastChangedSlotIndex === index;
 
           return (
@@ -150,6 +153,12 @@ export default function NumberingEditor({
                       </span>
                     ) : null}
                   </button>
+                  {isActiveSlot && (
+                    <span
+                      className="pointer-events-none absolute left-1/2 top-[1.12em] h-1 w-4 -translate-x-1/2 rounded-full bg-black/20"
+                      aria-hidden="true"
+                    />
+                  )}
                 </span>
               )}
             </React.Fragment>
