@@ -77,19 +77,6 @@ export default function SoloGamePage() {
     setWarningMessage('');
 
     setGameState(prev => {
-      // 1. 클릭한 인덱스가 이미 어떤 괄호에 포함되어 있는지 검사
-      const existingParenthesis = prev.parentheses.find(
-        p => p.startDigitIndex <= index && index <= p.endDigitIndex
-      );
-      if (existingParenthesis) {
-        // 즉시 괄호 삭제
-        return {
-          ...prev,
-          parentheses: prev.parentheses.filter(p => p.id !== existingParenthesis.id),
-          selection: { type: 'none' },
-        };
-      }
-
       // 괄호가 없다면 새로운 범위 선택 시작
       return {
         ...prev,
@@ -312,6 +299,7 @@ export default function SoloGamePage() {
                 onDigitPointerDown={handleDigitPointerDown}
                 onDigitPointerEnter={handleDigitPointerEnter}
                 onDigitPointerUp={handleDigitPointerUp}
+                onParenthesisClick={handleDeleteParenthesis}
                 onSelectSlot={handleSelectSlot}
               />
 

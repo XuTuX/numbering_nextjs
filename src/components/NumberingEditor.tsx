@@ -18,6 +18,7 @@ interface NumberingEditorProps {
   onDigitPointerDown: (index: number) => void;
   onDigitPointerEnter: (index: number) => void;
   onDigitPointerUp: () => void;
+  onParenthesisClick?: (id: string) => void;
   onSelectSlot: (index: number) => void;
 }
 
@@ -31,6 +32,7 @@ export default function NumberingEditor({
   onDigitPointerDown,
   onDigitPointerEnter,
   onDigitPointerUp,
+  onParenthesisClick,
   onSelectSlot,
 }: NumberingEditorProps) {
 
@@ -90,13 +92,17 @@ export default function NumberingEditor({
           return (
             <React.Fragment key={`digit-${index}`}>
               {opens.map((range) => (
-                <span
+                <button
                   key={`open-${range.id}`}
-                  className="relative -mr-[0.1em] px-[0.1em] text-[0.8em] font-light text-gray-300"
-                  aria-label="여는 괄호"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onParenthesisClick?.(range.id);
+                  }}
+                  className="relative z-20 -mr-[0.1em] px-[0.1em] text-[0.8em] font-light text-gray-300 hover:text-red-500 cursor-pointer transition-colors"
+                  aria-label="여는 괄호 삭제"
                 >
                   (
-                </span>
+                </button>
               ))}
 
               <span className="relative inline-flex items-center z-10 touch-none">
@@ -130,13 +136,17 @@ export default function NumberingEditor({
               </span>
 
               {closes.map((range) => (
-                <span
+                <button
                   key={`close-${range.id}`}
-                  className="relative -ml-[0.1em] px-[0.1em] text-[0.8em] font-light text-gray-300"
-                  aria-label="닫는 괄호"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onParenthesisClick?.(range.id);
+                  }}
+                  className="relative z-20 -ml-[0.1em] px-[0.1em] text-[0.8em] font-light text-gray-300 hover:text-red-500 cursor-pointer transition-colors"
+                  aria-label="닫는 괄호 삭제"
                 >
                   )
-                </span>
+                </button>
               ))}
 
               {index < digits.length - 1 && (
