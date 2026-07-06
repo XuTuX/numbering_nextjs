@@ -15,7 +15,9 @@ interface NumberingEditorProps {
   parentheses: ParenthesisRange[];
   selection: EditorSelection;
   lastChangedSlotIndex: number | null;
-  onDigitClick: (index: number) => void;
+  onDigitPointerDown: (index: number) => void;
+  onDigitPointerEnter: (index: number) => void;
+  onDigitPointerUp: () => void;
   onSelectSlot: (index: number) => void;
 }
 
@@ -26,7 +28,9 @@ export default function NumberingEditor({
   parentheses,
   selection,
   lastChangedSlotIndex,
-  onDigitClick,
+  onDigitPointerDown,
+  onDigitPointerEnter,
+  onDigitPointerUp,
   onSelectSlot,
 }: NumberingEditorProps) {
 
@@ -95,12 +99,18 @@ export default function NumberingEditor({
                 </span>
               ))}
 
-              <span className="relative inline-flex items-center z-10">
+              <span className="relative inline-flex items-center z-10 touch-none">
                 <button
                   tabIndex={0}
-                  onClick={(e) => {
+                  onPointerDown={(e) => {
                     e.stopPropagation();
-                    onDigitClick(index);
+                    e.currentTarget.releasePointerCapture(e.pointerId);
+                    onDigitPointerDown(index);
+                  }}
+                  onPointerEnter={() => onDigitPointerEnter(index)}
+                  onPointerUp={(e) => {
+                    e.stopPropagation();
+                    onDigitPointerUp();
                   }}
                   className={`relative flex h-[1.3em] min-w-[0.65em] items-center justify-center rounded-lg px-[0.1em] outline-none transition-all duration-200 cursor-pointer hover:bg-black/[0.02] ${
                     isSelected || isSelectionStartOnly

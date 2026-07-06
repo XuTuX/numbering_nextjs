@@ -71,91 +71,79 @@ export default function SoloGamePage() {
     setLastChangedSlotIndex(null);
   };
 
-  // Handle range selection by tapping digits
-  const handleDigitClick = (index: number) => {
+  // Handle drag selection
+  const handleDigitPointerDown = (index: number) => {
     if (gameState.status !== 'playing') return;
     setWarningMessage('');
 
     setGameState(prev => {
-      const selection = prev.selection;
-
-      if (selection.type !== 'range') {
+      // 1. 클릭한 인덱스가 이미 어떤 괄호에 포함되어 있는지 검사
+      const existingParenthesis = prev.parentheses.find(
+        p => p.startDigitIndex <= index && index <= p.endDigitIndex
+      );
+      if (existingParenthesis) {
+        // 즉시 괄호 삭제
         return {
           ...prev,
-          selection: { type: 'range', startDigitIndex: index, endDigitIndex: null },
-        };
-      }
-
-      const { startDigitIndex, endDigitIndex } = selection;
-
-      // 1. Start is selected and user clicked it again -> deselect
-      if (startDigitIndex === index && endDigitIndex === null) {
-        return {
-          ...prev,
+          parentheses: prev.parentheses.filter(p => p.id !== existingParenthesis.id),
           selection: { type: 'none' },
         };
       }
 
-      if (endDigitIndex !== null) {
-        const start = Math.min(startDigitIndex, endDigitIndex);
-        const end = Math.max(startDigitIndex, endDigitIndex);
-        if (start <= index && index <= end) {
-          return {
-            ...prev,
-            selection: { type: 'none' },
-          };
-        }
-      }
-
-      // 2. Start is selected, user clicked a different digit -> set end
-      if (endDigitIndex === null) {
-        return {
-          ...prev,
-          selection: { type: 'range', startDigitIndex, endDigitIndex: index },
-        };
-      }
-
-      // 3. Both selected, clicking outside the range -> reset selection to new start
+      // 괄호가 없다면 새로운 범위 선택 시작
       return {
         ...prev,
-        selection: { type: 'range', startDigitIndex: index, endDigitIndex: null },
+        selection: { type: 'range', startDigitIndex: index, endDigitIndex: null }
       };
     });
   };
 
-  // wrap selection with parentheses
-  const handleWrapParentheses = () => {
+  const handleDigitPointerEnter = (index: number) => {
     if (gameState.status !== 'playing') return;
-    if (gameState.selection.type !== 'range' || gameState.selection.endDigitIndex === null) return;
-    const { startDigitIndex, endDigitIndex } = gameState.selection;
-
-    const start = Math.min(startDigitIndex, endDigitIndex);
-    const end = Math.max(startDigitIndex, endDigitIndex);
-
-    // Validate boundaries
-    // 1. Is there an identical parenthesis range?
-    const exactDuplicate = gameState.parentheses.some(
-      p => p.startDigitIndex === start && p.endDigitIndex === end
-    );
-    if (exactDuplicate) {
-      setWarningMessage('이미 동일한 범위가 괄호로 묶여 있습니다.');
-      return;
-    }
-
-    // 2. Do they cross?
-    // Parentheses cross if they partially overlap.
-    const crossing = gameState.parentheses.some(p => {
-      const A = p.startDigitIndex;
-      const B = p.endDigitIndex;
-      return (start < A && A < end && end < B) || (A < start && start < B && B < end);
-    });
-
-    if (crossing) {
-      setWarningMessage('괄호 범위가 서로 교차할 수 없습니다.');
-      return;
-    }
-
+    
     setGameState(prev => {
+      if (prev.selection.type !== 'range') return prev;
+      return {
+        ...prev,
+        selection: { ...prev.selection, endDigitIndex: index }
+      };
+    });
+  };
+
+  const handleDigitPointerUp = () => {
+    if (gameState.status !== 'playing') return;
+    
+    setGameState(prev => {
+      if (prev.selection.type !== 'range') return prev;
+      const { startDigitIndex, endDigitIndex } = prev.selection;
+      
+      // 1개만 선택된 채 끝났으면 그냥 선택 해제
+      if (endDigitIndex === null || Math.abs(endDigitIndex - startDigitIndex) < 1) {
+        return { ...prev, selection: { type: 'none' } };
+      }
+
+      const start = Math.min(startDigitIndex, endDigitIndex);
+      const end = Math.max(startDigitIndex, endDigitIndex);
+
+      // Validate boundaries
+      const exactDuplicate = prev.parentheses.some(
+        p => p.startDigitIndex === start && p.endDigitIndex === end
+      );
+      if (exactDuplicate) {
+        setWarningMessage('이미 동일한 범위가 괄호로 묶여 있습니다.');
+        return { ...prev, selection: { type: 'none' } };
+      }
+
+      const crossing = prev.parentheses.some(p => {
+        const A = p.startDigitIndex;
+        const B = p.endDigitIndex;
+        return (start < A && A < end && end < B) || (A < start && start < B && B < end);
+      });
+      if (crossing) {
+        setWarningMessage('괄호 범위가 서로 교차할 수 없습니다.');
+        return { ...prev, selection: { type: 'none' } };
+      }
+
       const newParenthesis = {
         id: Math.random().toString(36).substring(2, 9),
         startDigitIndex: start,
@@ -168,7 +156,6 @@ export default function SoloGamePage() {
         selection: { type: 'none' },
       };
     });
-    setWarningMessage('');
   };
 
   const handleDeleteParenthesis = (id: string) => {
@@ -292,35 +279,10 @@ export default function SoloGamePage() {
 
   const isSubmitEnabled = gameState.status === 'playing' && currentExpression.includes('=');
   const displayMessage = warningMessage || validationMessage;
-  const hasSelectedRange =
-    gameState.selection.type === 'range' && gameState.selection.endDigitIndex !== null;
-
   const selectedSlotIndex =
     gameState.selection.type === 'slot' || gameState.selection.type === 'operator'
       ? gameState.selection.slotIndex
       : null;
-
-  const selStart =
-    gameState.selection.type === 'range'
-      ? Math.min(
-          gameState.selection.startDigitIndex,
-          gameState.selection.endDigitIndex ?? gameState.selection.startDigitIndex
-        )
-      : null;
-  const selEnd =
-    gameState.selection.type === 'range'
-      ? Math.max(
-          gameState.selection.startDigitIndex,
-          gameState.selection.endDigitIndex ?? gameState.selection.startDigitIndex
-        )
-      : null;
-
-  const exactParenthesisMatch = hasSelectedRange
-    ? gameState.parentheses.find(
-        (p) => p.startDigitIndex === selStart && p.endDigitIndex === selEnd
-      )
-    : null;
-  const selectedParenthesisId = exactParenthesisMatch ? exactParenthesisMatch.id : null;
 
   return (
     <div
@@ -347,7 +309,9 @@ export default function SoloGamePage() {
                 parentheses={gameState.parentheses}
                 selection={gameState.selection}
                 lastChangedSlotIndex={lastChangedSlotIndex}
-                onDigitClick={handleDigitClick}
+                onDigitPointerDown={handleDigitPointerDown}
+                onDigitPointerEnter={handleDigitPointerEnter}
+                onDigitPointerUp={handleDigitPointerUp}
                 onSelectSlot={handleSelectSlot}
               />
 
@@ -372,33 +336,6 @@ export default function SoloGamePage() {
                       handleSelectOperator(selectedSlotIndex, newOperator)
                     }
                   />
-                )}
-
-                {hasSelectedRange && (selEnd! - selStart! >= 2 || selectedParenthesisId) && (
-                  <div className="w-full max-w-lg mx-auto flex flex-col items-center justify-center gap-2 p-2 animate-in fade-in zoom-in duration-200">
-                    <div className="text-xs font-medium text-gray-500">
-                      {selectedParenthesisId ? '선택한 범위의 괄호를 해제할 수 있습니다.' : '선택한 범위를 괄호로 묶을 수 있습니다.'}
-                    </div>
-                    <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm">
-                      {selectedParenthesisId ? (
-                        <button
-                          onClick={() => handleDeleteParenthesis(selectedParenthesisId)}
-                          className="px-8 h-12 flex items-center justify-center rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
-                        >
-                          삭제
-                        </button>
-                      ) : (
-                        selEnd! - selStart! >= 2 && (
-                          <button
-                            onClick={handleWrapParentheses}
-                            className="px-8 h-12 flex items-center justify-center rounded-xl text-sm font-semibold bg-[#111111] text-white hover:scale-[1.02] active:scale-95 transition-all"
-                          >
-                            ( ) 묶기
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </div>
                 )}
               </div>
 
