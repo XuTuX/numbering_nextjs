@@ -157,12 +157,31 @@ export default function SoloGamePage() {
   const handleSelectSlot = (index: number) => {
     if (gameState.status !== 'playing') return;
     setWarningMessage('');
-    setGameState(prev => ({
-      ...prev,
-      selection: prev.operatorSlots.find((slot) => slot.index === index)?.operator
-        ? { type: 'operator', slotIndex: index }
-        : { type: 'slot', slotIndex: index },
-    }));
+    
+    setGameState(prev => {
+      const existingOperator = prev.operatorSlots.find((slot) => slot.index === index)?.operator;
+      
+      // 이미 연산자가 있다면 클릭 시 바로 삭제
+      if (existingOperator) {
+        const newSlots = prev.operatorSlots.map(s => {
+          if (s.index === index) {
+            return { ...s, operator: null };
+          }
+          return s;
+        });
+        return {
+          ...prev,
+          operatorSlots: newSlots,
+          selection: { type: 'none' },
+        };
+      }
+      
+      // 비어있다면 팝업 띄우기
+      return {
+        ...prev,
+        selection: { type: 'slot', slotIndex: index },
+      };
+    });
   };
 
   const handleSelectOperator = (index: number, op: InlineOperator | null) => {

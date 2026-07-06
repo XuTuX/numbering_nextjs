@@ -47,20 +47,6 @@ export default function InlineOperatorMenu({
           );
         })}
         
-        {currentOperator && (
-          <>
-            <div className="w-px h-8 bg-gray-200 mx-1" />
-            <button
-              onClick={() => {
-                onSelect(null);
-              }}
-              className="px-4 h-12 flex items-center justify-center rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
-              aria-label="연산자 삭제"
-            >
-              삭제
-            </button>
-          </>
-        )}
       </div>
     </div>
   );
