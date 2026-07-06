@@ -5,6 +5,7 @@ import {
   EditorSelection,
   OperatorSlot,
   ParenthesisRange,
+  InlineOperator,
 } from '@/types/game';
 import { PuzzleDifficulty } from '@/lib/puzzleTypes';
 
@@ -20,6 +21,7 @@ interface NumberingEditorProps {
   onDigitPointerUp: () => void;
   onParenthesisClick?: (id: string) => void;
   onSelectSlot: (index: number) => void;
+  onOperatorDrop: (index: number, operator: InlineOperator) => void;
 }
 
 export default function NumberingEditor({
@@ -34,7 +36,9 @@ export default function NumberingEditor({
   onDigitPointerUp,
   onParenthesisClick,
   onSelectSlot,
+  onOperatorDrop,
 }: NumberingEditorProps) {
+  const [dragOverSlotIndex, setDragOverSlotIndex] = React.useState<number | null>(null);
 
 
   const selectedStart =
@@ -153,13 +157,28 @@ export default function NumberingEditor({
                 <span
                   className="relative inline-flex items-center justify-center transition-[width] duration-300 ease-out"
                   style={{ width: slotOperator ? slotWidthFilled : slotWidthEmpty }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (dragOverSlotIndex !== index) setDragOverSlotIndex(index);
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverSlotIndex === index) setDragOverSlotIndex(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOverSlotIndex(null);
+                    const op = e.dataTransfer.getData('text/plain') as InlineOperator;
+                    if (['+', '-', '×', '÷', '='].includes(op)) {
+                      onOperatorDrop(index, op);
+                    }
+                  }}
                 >
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onSelectSlot(index);
                     }}
-                    className="absolute top-1/2 left-1/2 flex min-h-[44px] min-w-[44px] w-[1.5em] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full outline-none"
+                    className={`absolute top-1/2 left-1/2 flex min-h-[44px] min-w-[44px] w-[1.5em] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full outline-none transition-colors ${dragOverSlotIndex === index ? 'bg-black/5 scale-110' : ''}`}
                     aria-label={`${digits[index]}와 ${digits[index + 1]} 사이 ${
                       slotOperator ? `${slotOperator} 연산자 수정` : '연산자 삽입'
                     }`}

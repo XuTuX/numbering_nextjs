@@ -7,7 +7,7 @@ import NumberingEditor from '@/components/NumberingEditor';
 import DifficultySelector from '@/components/DifficultySelector';
 import PuzzleResultModal from '@/components/PuzzleResultModal';
 import BottomGameActions from '@/components/BottomGameActions';
-import InlineOperatorMenu from '@/components/InlineOperatorMenu';
+import DraggableOperatorBar from '@/components/DraggableOperatorBar';
 
 import { SoloGameState, PuzzleDifficulty } from '@/lib/puzzleTypes';
 import { InlineOperator } from '@/types/game';
@@ -158,33 +158,23 @@ export default function SoloGamePage() {
     if (gameState.status !== 'playing') return;
     setWarningMessage('');
     
+    // 클릭 시 바로 연산자 삭제 (드래그 앤 드롭이므로 팝업 불필요)
     setGameState(prev => {
-      const existingOperator = prev.operatorSlots.find((slot) => slot.index === index)?.operator;
-      
-      // 이미 연산자가 있다면 클릭 시 바로 삭제
-      if (existingOperator) {
-        const newSlots = prev.operatorSlots.map(s => {
-          if (s.index === index) {
-            return { ...s, operator: null };
-          }
-          return s;
-        });
-        return {
-          ...prev,
-          operatorSlots: newSlots,
-          selection: { type: 'none' },
-        };
-      }
-      
-      // 비어있다면 팝업 띄우기
+      const newSlots = prev.operatorSlots.map(s => {
+        if (s.index === index) {
+          return { ...s, operator: null };
+        }
+        return s;
+      });
       return {
         ...prev,
-        selection: { type: 'slot', slotIndex: index },
+        operatorSlots: newSlots,
+        selection: { type: 'none' },
       };
     });
   };
 
-  const handleSelectOperator = (index: number, op: InlineOperator | null) => {
+  const handleOperatorDrop = (index: number, op: InlineOperator) => {
     if (gameState.status !== 'playing') return;
     setWarningMessage('');
     setGameState(prev => {
@@ -255,19 +245,17 @@ export default function SoloGamePage() {
     return '';
   }, [currentExpression, gameState.status, gameState.puzzle]);
 
-  const handleSubmit = () => {
-    if (!gameState.puzzle) return;
-    const result = validateEquation(currentExpression, gameState.puzzle.digitString);
-
-    if (result.valid && result.isCorrect) {
-      setGameState(prev => ({ ...prev, status: 'correct' }));
-    } else {
-      setGameState(prev => ({ ...prev, status: 'wrong' }));
-      setTimeout(() => {
-        setGameState(prev => (prev.status === 'wrong' ? { ...prev, status: 'playing' } : prev));
-      }, 1500);
+  // 자동 제출 로직 (정답 시 자동으로 status 변경)
+  useEffect(() => {
+    if (gameState.status === 'playing' && gameState.puzzle && currentExpression) {
+      const result = validateEquation(currentExpression, gameState.puzzle.digitString);
+      if (result.valid && result.isCorrect) {
+        setGameState(prev => ({ ...prev, status: 'correct' }));
+      }
     }
-  };
+  }, [currentExpression, gameState.status, gameState.puzzle]);
+
+  // 수동 제출 함수 제거 (자동 제출로 대체)
 
   const handleHintClick = () => {
     if (gameState.hintCount > 0 && gameState.status === 'playing' && gameState.puzzle) {
@@ -291,12 +279,7 @@ export default function SoloGamePage() {
     }
   };
 
-  const isSubmitEnabled = gameState.status === 'playing' && currentExpression.includes('=');
   const displayMessage = warningMessage || validationMessage;
-  const selectedSlotIndex =
-    gameState.selection.type === 'slot' || gameState.selection.type === 'operator'
-      ? gameState.selection.slotIndex
-      : null;
 
   return (
     <div
@@ -328,6 +311,7 @@ export default function SoloGamePage() {
                 onDigitPointerUp={handleDigitPointerUp}
                 onParenthesisClick={handleDeleteParenthesis}
                 onSelectSlot={handleSelectSlot}
+                onOperatorDrop={handleOperatorDrop}
               />
 
               {/* 
@@ -341,27 +325,16 @@ export default function SoloGamePage() {
                 </div>
               )}
 
-              <div className="mb-4 flex min-h-[96px] items-center justify-center">
-                {selectedSlotIndex !== null && (
-                  <InlineOperatorMenu
-                    currentOperator={
-                      gameState.operatorSlots.find((s) => s.index === selectedSlotIndex)?.operator ?? null
-                    }
-                    onSelect={(newOperator) =>
-                      handleSelectOperator(selectedSlotIndex, newOperator)
-                    }
-                  />
-                )}
+              <div className="mb-4 flex flex-col items-center justify-center">
+                <DraggableOperatorBar onDragStart={() => setWarningMessage('')} />
               </div>
 
               {/* Bottom Gameplay Actions */}
               <BottomGameActions
                 difficulty={gameState.difficulty}
                 hintCount={gameState.hintCount}
-                isSubmitEnabled={isSubmitEnabled}
                 onHintClick={handleHintClick}
                 onResetClick={handleResetClick}
-                onSubmitClick={handleSubmit}
               />
             </>
           )}

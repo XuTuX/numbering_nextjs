@@ -88,6 +88,14 @@ function generateEasy(): { expr: string; digits: string } | null {
       const C = A - B;
       return { expr: `${C} = ${A} - ${B}`, vars: [C, A, B], value: C };
     },
+    () => { // Identity: A × 1 = A (length 5: A is 2-digit)
+      const A = getRandomInt(10, 99);
+      return { expr: `${A} × 1 = ${A}`, vars: [A, 1, A], value: A };
+    },
+    () => { // Zero: A + 0 = A (length 5: A is 2-digit)
+      const A = getRandomInt(10, 99);
+      return { expr: `${A} + 0 = ${A}`, vars: [A, 0, A], value: A };
+    },
   ];
 
   const candidate = templates[getRandomInt(0, templates.length - 1)]();
@@ -182,6 +190,15 @@ function generateNormal(): { expr: string; digits: string } | null {
       const C = getRandomInt(1, product - 1);
       const D = product - C;
       return { expr: `${A} × ${B} = ${C} + ${D}`, vars: [A, B, C, D], value: product };
+    },
+    () => { // Commutative: A × B = B × A (length 6: A=2, B=1)
+      const A = getRandomInt(10, 99);
+      const B = getRandomInt(2, 9);
+      return { expr: `${A} × ${B} = ${B} × ${A}`, vars: [A, B, B, A], value: A * B };
+    },
+    () => { // Identity mix: A × 1 = A + 0 (length 6: A=2)
+      const A = getRandomInt(10, 99);
+      return { expr: `${A} × 1 = ${A} + 0`, vars: [A, 1, A, 0], value: A };
     },
   ];
 
