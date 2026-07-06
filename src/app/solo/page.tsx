@@ -273,10 +273,18 @@ export default function SoloGamePage() {
     if (gameState.hintCount > 0 && gameState.status === 'playing' && gameState.puzzle) {
       setGameState(prev => ({ ...prev, hintCount: prev.hintCount - 1 }));
 
+      const answerValidation = validateEquation(
+        gameState.puzzle.answerExpression,
+        gameState.puzzle.digitString
+      );
+      const valueHint = answerValidation.valid
+        ? `등호 양쪽의 값은 ${answerValidation.leftValue} 입니다.`
+        : '정답 수식은 등호 양쪽이 같은 값이 됩니다.';
+
       const hints = [
         `이 문제에는 '${gameState.puzzle.usedOperators[Math.floor(Math.random() * gameState.puzzle.usedOperators.length)]}' 기호가 포함됩니다.`,
         gameState.puzzle.usedOperators.includes('(') ? '이 문제에는 괄호가 필요합니다.' : '이 문제에는 괄호가 필요하지 않습니다.',
-        `결과값은 ${gameState.puzzle.answerExpression.split('=')[1].trim()} 입니다.`,
+        valueHint,
       ];
       const randomHint = hints[Math.floor(Math.random() * hints.length)];
       setWarningMessage(`힌트: ${randomHint}`);
