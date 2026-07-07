@@ -11,7 +11,7 @@ import DraggableOperatorBar from '@/components/DraggableOperatorBar';
 
 import { SoloGameState, PuzzleDifficulty } from '@/lib/puzzleTypes';
 import { InlineOperator } from '@/types/game';
-import { DndContext, DragEndEvent, DragOverlay } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragOverlay, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { generatePuzzle } from '@/lib/puzzleGenerator';
 import { validateEquation } from '@/lib/expressionValidator';
 import { buildExpression } from '@/lib/expression';
@@ -33,6 +33,16 @@ export default function SoloGamePage() {
   const [warningMessage, setWarningMessage] = useState<string>('');
   const [lastChangedSlotIndex, setLastChangedSlotIndex] = useState<number | null>(null);
   const [activeDragOperator, setActiveDragOperator] = useState<InlineOperator | null>(null);
+
+  // Configure dnd-kit sensors for both pointer (mouse) and touch with very low activation threshold
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 5 },
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { delay: 100, tolerance: 5 },
+  });
+  const keyboardSensor = useSensor(KeyboardSensor);
+  const sensors = useSensors(pointerSensor, touchSensor, keyboardSensor);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -317,7 +327,7 @@ export default function SoloGamePage() {
             <DifficultySelector onSelect={startNewPuzzle} />
           ) : (
             <>
-              <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                 {/* Main Numbering Workspace Editor */}
                 <NumberingEditor
                   difficulty={gameState.difficulty}

@@ -200,43 +200,55 @@ function DroppableSlot({
   const { active } = useDndContext();
   const isDragging = active !== null;
 
-  // When dragging and hovering over this slot, widen it to show the drop target clearly.
-  const dynamicWidth = isOver ? '1.5em' : (slotOperator ? slotWidthFilled : slotWidthEmpty);
+  // When hovering over this slot while dragging, widen it to show the drop target.
+  const dynamicWidth = isOver ? '1.8em' : (slotOperator ? slotWidthFilled : slotWidthEmpty);
 
   return (
     <span
-      ref={setNodeRef}
       className="relative inline-flex items-center justify-center transition-all duration-300 ease-out"
       style={{ 
         width: dynamicWidth,
-        // Raise zIndex so hit area is huge when dragging, allowing easy drops.
         zIndex: (isDragging || slotOperator !== null) ? 30 : 0
       }}
     >
+      {/* 
+        The droppable ref goes on this large invisible overlay.
+        dnd-kit uses the DOM rect of the ref element for collision detection,
+        so this needs to be big enough to catch drops easily.
+      */}
+      <div
+        ref={setNodeRef}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+        style={{
+          width: isDragging ? '80px' : '56px',
+          height: isDragging ? '120px' : '56px',
+        }}
+      />
+
+      {/* Visual button for click-to-delete and operator display */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onSelectSlot(index);
         }}
-        className={`absolute top-1/2 left-1/2 flex items-center justify-center rounded-full outline-none transition-all
-          ${isDragging ? 'min-h-[100px] min-w-[80px]' : 'min-h-[56px] min-w-[56px] w-[2.5em]'}
-          -translate-x-1/2 -translate-y-1/2
-        `}
+        className="absolute top-1/2 left-1/2 flex min-h-[56px] min-w-[56px] w-[2.5em] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full outline-none transition-all"
         aria-label={`${digits[index]}와 ${digits[index + 1]} 사이 ${
           slotOperator ? `${slotOperator} 연산자 수정` : '연산자 삽입'
         }`}
       >
         <div className={`flex items-center justify-center transition-all duration-300 rounded-full
-          ${isOver ? 'w-10 h-10 bg-black/5 scale-110 shadow-inner' : 'w-full h-full'}
+          ${isOver ? 'w-10 h-10 bg-black/8 scale-125' : 'w-full h-full'}
         `}>
           {slotOperator ? (
             <span
-              className={`text-[0.7em] font-light text-[#151515] transition-transform ${
+              className={`text-[0.7em] font-light text-[#151515] transition-all ${
                 isChanged ? 'animate-bump scale-110' : ''
-              } ${isOver ? 'opacity-30' : 'opacity-100'}`}
+              } ${isOver ? 'opacity-20 scale-75' : 'opacity-100'}`}
             >
               {slotOperator}
             </span>
+          ) : isOver ? (
+            <span className="w-2 h-2 rounded-full bg-black/20 animate-pulse" />
           ) : null}
         </div>
       </button>
