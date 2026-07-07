@@ -21,7 +21,7 @@ interface NumberingEditorProps {
   onDigitPointerUp: () => void;
   onParenthesisClick?: (id: string) => void;
   onSelectSlot: (index: number) => void;
-  onOperatorDrop: (index: number, operator: InlineOperator) => void;
+  activeToolOperator: InlineOperator | null;
 }
 
 export default function NumberingEditor({
@@ -36,9 +36,9 @@ export default function NumberingEditor({
   onDigitPointerUp,
   onParenthesisClick,
   onSelectSlot,
-  onOperatorDrop,
+  activeToolOperator,
 }: NumberingEditorProps) {
-  const [dragOverSlotIndex, setDragOverSlotIndex] = React.useState<number | null>(null);
+
 
 
   const selectedStart =
@@ -156,21 +156,9 @@ export default function NumberingEditor({
               {index < digits.length - 1 && (
                 <span
                   className="relative inline-flex items-center justify-center transition-[width] duration-300 ease-out"
-                  style={{ width: slotOperator ? slotWidthFilled : slotWidthEmpty }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (dragOverSlotIndex !== index) setDragOverSlotIndex(index);
-                  }}
-                  onDragLeave={() => {
-                    if (dragOverSlotIndex === index) setDragOverSlotIndex(null);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragOverSlotIndex(null);
-                    const op = e.dataTransfer.getData('text/plain') as InlineOperator;
-                    if (['+', '-', '×', '÷', '='].includes(op)) {
-                      onOperatorDrop(index, op);
-                    }
+                  style={{ 
+                    width: slotOperator ? slotWidthFilled : slotWidthEmpty,
+                    zIndex: (activeToolOperator !== null || slotOperator !== null) ? 30 : 0
                   }}
                 >
                   <button
@@ -178,7 +166,7 @@ export default function NumberingEditor({
                       e.stopPropagation();
                       onSelectSlot(index);
                     }}
-                    className={`absolute top-1/2 left-1/2 flex min-h-[44px] min-w-[44px] w-[1.5em] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full outline-none transition-colors ${dragOverSlotIndex === index ? 'bg-black/5 scale-110' : ''}`}
+                    className={`absolute top-1/2 left-1/2 flex min-h-[56px] min-w-[56px] w-[2.5em] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full outline-none transition-all`}
                     aria-label={`${digits[index]}와 ${digits[index + 1]} 사이 ${
                       slotOperator ? `${slotOperator} 연산자 수정` : '연산자 삽입'
                     }`}

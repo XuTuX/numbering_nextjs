@@ -7,7 +7,7 @@ import NumberingEditor from '@/components/NumberingEditor';
 import DifficultySelector from '@/components/DifficultySelector';
 import PuzzleResultModal from '@/components/PuzzleResultModal';
 import BottomGameActions from '@/components/BottomGameActions';
-import DraggableOperatorBar from '@/components/DraggableOperatorBar';
+import OperatorToolbar from '@/components/OperatorToolbar';
 
 import { SoloGameState, PuzzleDifficulty } from '@/lib/puzzleTypes';
 import { InlineOperator } from '@/types/game';
@@ -31,6 +31,7 @@ export default function SoloGamePage() {
   const [timer, setTimer] = useState(0);
   const [warningMessage, setWarningMessage] = useState<string>('');
   const [lastChangedSlotIndex, setLastChangedSlotIndex] = useState<number | null>(null);
+  const [activeToolOperator, setActiveToolOperator] = useState<InlineOperator | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -158,38 +159,28 @@ export default function SoloGamePage() {
     if (gameState.status !== 'playing') return;
     setWarningMessage('');
     
-    // 클릭 시 바로 연산자 삭제 (드래그 앤 드롭이므로 팝업 불필요)
     setGameState(prev => {
-      const newSlots = prev.operatorSlots.map(s => {
-        if (s.index === index) {
-          return { ...s, operator: null };
+      const existingOperator = prev.operatorSlots.find((slot) => slot.index === index)?.operator;
+      
+      // 활성화된 툴이 없을 때: 클릭 시 연산자 삭제
+      if (!activeToolOperator) {
+        if (existingOperator) {
+          const newSlots = prev.operatorSlots.map(s => s.index === index ? { ...s, operator: null } : s);
+          return { ...prev, operatorSlots: newSlots, selection: { type: 'none' } };
         }
-        return s;
-      });
-      return {
-        ...prev,
-        operatorSlots: newSlots,
-        selection: { type: 'none' },
-      };
-    });
-  };
-
-  const handleOperatorDrop = (index: number, op: InlineOperator) => {
-    if (gameState.status !== 'playing') return;
-    setWarningMessage('');
-    setGameState(prev => {
-      const newSlots = prev.operatorSlots.map(s => {
-        if (s.index === index) {
-          return { ...s, operator: op };
-        }
-        return s;
-      });
-
-      return {
-        ...prev,
-        operatorSlots: newSlots,
-        selection: { type: 'none' },
-      };
+        return prev;
+      }
+      
+      // 활성화된 툴이 있을 때:
+      // 이미 같은 연산자가 있다면 토글(삭제)
+      if (existingOperator === activeToolOperator) {
+        const newSlots = prev.operatorSlots.map(s => s.index === index ? { ...s, operator: null } : s);
+        return { ...prev, operatorSlots: newSlots, selection: { type: 'none' } };
+      }
+      
+      // 다른 연산자이거나 빈 칸이면 덮어쓰기/삽입
+      const newSlots = prev.operatorSlots.map(s => s.index === index ? { ...s, operator: activeToolOperator } : s);
+      return { ...prev, operatorSlots: newSlots, selection: { type: 'none' } };
     });
 
     setLastChangedSlotIndex(index);
@@ -311,7 +302,7 @@ export default function SoloGamePage() {
                 onDigitPointerUp={handleDigitPointerUp}
                 onParenthesisClick={handleDeleteParenthesis}
                 onSelectSlot={handleSelectSlot}
-                onOperatorDrop={handleOperatorDrop}
+                activeToolOperator={activeToolOperator}
               />
 
               {/* 
@@ -326,7 +317,13 @@ export default function SoloGamePage() {
               )}
 
               <div className="mb-4 flex flex-col items-center justify-center">
-                <DraggableOperatorBar onDragStart={() => setWarningMessage('')} />
+                <OperatorToolbar 
+                  activeOperator={activeToolOperator} 
+                  onSelectOperator={(op) => {
+                    setActiveToolOperator(prev => prev === op ? null : op);
+                    setWarningMessage('');
+                  }} 
+                />
               </div>
 
               {/* Bottom Gameplay Actions */}
