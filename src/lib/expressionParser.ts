@@ -59,7 +59,6 @@ export function evaluateExpression(expr: string): { valid: true; value: number }
         case '+': res = val1 + val2; break;
         case '-': 
           res = val1 - val2; 
-          if (res < 0) throw new Error('계산 과정에서 음수가 발생했습니다.');
           break;
         case '×': res = val1 * val2; break;
         case '÷':
