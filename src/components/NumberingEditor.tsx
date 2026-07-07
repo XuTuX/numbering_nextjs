@@ -8,6 +8,7 @@ import {
   InlineOperator,
 } from '@/types/game';
 import { PuzzleDifficulty } from '@/lib/puzzleTypes';
+import { useDroppable, useDndContext } from '@dnd-kit/core';
 
 interface NumberingEditorProps {
   difficulty: PuzzleDifficulty;
@@ -21,7 +22,7 @@ interface NumberingEditorProps {
   onDigitPointerUp: () => void;
   onParenthesisClick?: (id: string) => void;
   onSelectSlot: (index: number) => void;
-  activeToolOperator: InlineOperator | null;
+  onOperatorDrop: (index: number, operator: InlineOperator) => void;
 }
 
 export default function NumberingEditor({
@@ -36,7 +37,7 @@ export default function NumberingEditor({
   onDigitPointerUp,
   onParenthesisClick,
   onSelectSlot,
-  activeToolOperator,
+  onOperatorDrop,
 }: NumberingEditorProps) {
 
 
@@ -154,45 +155,97 @@ export default function NumberingEditor({
               ))}
 
               {index < digits.length - 1 && (
-                <span
-                  className="relative inline-flex items-center justify-center transition-[width] duration-300 ease-out"
-                  style={{ 
-                    width: slotOperator ? slotWidthFilled : slotWidthEmpty,
-                    zIndex: (activeToolOperator !== null || slotOperator !== null) ? 30 : 0
-                  }}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectSlot(index);
-                    }}
-                    className={`absolute top-1/2 left-1/2 flex min-h-[56px] min-w-[56px] w-[2.5em] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full outline-none transition-all`}
-                    aria-label={`${digits[index]}와 ${digits[index + 1]} 사이 ${
-                      slotOperator ? `${slotOperator} 연산자 수정` : '연산자 삽입'
-                    }`}
-                  >
-                    {slotOperator ? (
-                      <span
-                        className={`text-[0.7em] font-light text-[#151515] transition-transform ${
-                          isChanged ? 'animate-bump scale-110' : ''
-                        }`}
-                      >
-                        {slotOperator}
-                      </span>
-                    ) : null}
-                  </button>
-                  {isActiveSlot && (
-                    <span
-                      className="pointer-events-none absolute left-1/2 top-[1.08em] h-[0.08em] w-4 -translate-x-1/2 rounded-full bg-black/25"
-                      aria-hidden="true"
-                    />
-                  )}
-                </span>
+                <DroppableSlot
+                  index={index}
+                  slotOperator={slotOperator}
+                  isActiveSlot={isActiveSlot}
+                  isChanged={isChanged}
+                  slotWidthEmpty={slotWidthEmpty}
+                  slotWidthFilled={slotWidthFilled}
+                  digits={digits}
+                  onSelectSlot={onSelectSlot}
+                />
               )}
             </React.Fragment>
           );
         })}
       </div>
     </div>
+  );
+}
+
+function DroppableSlot({
+  index,
+  slotOperator,
+  isActiveSlot,
+  isChanged,
+  slotWidthEmpty,
+  slotWidthFilled,
+  digits,
+  onSelectSlot,
+}: {
+  index: number;
+  slotOperator: InlineOperator | null;
+  isActiveSlot: boolean;
+  isChanged: boolean;
+  slotWidthEmpty: string;
+  slotWidthFilled: string;
+  digits: string[];
+  onSelectSlot: (index: number) => void;
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `slot-${index}`,
+    data: { index },
+  });
+  const { active } = useDndContext();
+  const isDragging = active !== null;
+
+  // When dragging and hovering over this slot, widen it to show the drop target clearly.
+  const dynamicWidth = isOver ? '1.5em' : (slotOperator ? slotWidthFilled : slotWidthEmpty);
+
+  return (
+    <span
+      ref={setNodeRef}
+      className="relative inline-flex items-center justify-center transition-all duration-300 ease-out"
+      style={{ 
+        width: dynamicWidth,
+        // Raise zIndex so hit area is huge when dragging, allowing easy drops.
+        zIndex: (isDragging || slotOperator !== null) ? 30 : 0
+      }}
+    >
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelectSlot(index);
+        }}
+        className={`absolute top-1/2 left-1/2 flex items-center justify-center rounded-full outline-none transition-all
+          ${isDragging ? 'min-h-[100px] min-w-[80px]' : 'min-h-[56px] min-w-[56px] w-[2.5em]'}
+          -translate-x-1/2 -translate-y-1/2
+        `}
+        aria-label={`${digits[index]}와 ${digits[index + 1]} 사이 ${
+          slotOperator ? `${slotOperator} 연산자 수정` : '연산자 삽입'
+        }`}
+      >
+        <div className={`flex items-center justify-center transition-all duration-300 rounded-full
+          ${isOver ? 'w-10 h-10 bg-black/5 scale-110 shadow-inner' : 'w-full h-full'}
+        `}>
+          {slotOperator ? (
+            <span
+              className={`text-[0.7em] font-light text-[#151515] transition-transform ${
+                isChanged ? 'animate-bump scale-110' : ''
+              } ${isOver ? 'opacity-30' : 'opacity-100'}`}
+            >
+              {slotOperator}
+            </span>
+          ) : null}
+        </div>
+      </button>
+      {isActiveSlot && (
+        <span
+          className="pointer-events-none absolute left-1/2 top-[1.08em] h-[0.08em] w-4 -translate-x-1/2 rounded-full bg-black/25"
+          aria-hidden="true"
+        />
+      )}
+    </span>
   );
 }

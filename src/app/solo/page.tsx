@@ -7,10 +7,11 @@ import NumberingEditor from '@/components/NumberingEditor';
 import DifficultySelector from '@/components/DifficultySelector';
 import PuzzleResultModal from '@/components/PuzzleResultModal';
 import BottomGameActions from '@/components/BottomGameActions';
-import OperatorToolbar from '@/components/OperatorToolbar';
+import DraggableOperatorBar from '@/components/DraggableOperatorBar';
 
 import { SoloGameState, PuzzleDifficulty } from '@/lib/puzzleTypes';
 import { InlineOperator } from '@/types/game';
+import { DndContext, DragEndEvent, DragOverlay } from '@dnd-kit/core';
 import { generatePuzzle } from '@/lib/puzzleGenerator';
 import { validateEquation } from '@/lib/expressionValidator';
 import { buildExpression } from '@/lib/expression';
@@ -31,7 +32,7 @@ export default function SoloGamePage() {
   const [timer, setTimer] = useState(0);
   const [warningMessage, setWarningMessage] = useState<string>('');
   const [lastChangedSlotIndex, setLastChangedSlotIndex] = useState<number | null>(null);
-  const [activeToolOperator, setActiveToolOperator] = useState<InlineOperator | null>(null);
+  const [activeDragOperator, setActiveDragOperator] = useState<InlineOperator | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -159,34 +160,61 @@ export default function SoloGamePage() {
     if (gameState.status !== 'playing') return;
     setWarningMessage('');
     
+    // 클릭 시 연산자 삭제 (드래그 앤 드롭이므로 팝업 없이 직접 삭제만 수행)
     setGameState(prev => {
-      const existingOperator = prev.operatorSlots.find((slot) => slot.index === index)?.operator;
-      
-      // 활성화된 툴이 없을 때: 클릭 시 연산자 삭제
-      if (!activeToolOperator) {
-        if (existingOperator) {
-          const newSlots = prev.operatorSlots.map(s => s.index === index ? { ...s, operator: null } : s);
-          return { ...prev, operatorSlots: newSlots, selection: { type: 'none' } };
+      const newSlots = prev.operatorSlots.map(s => {
+        if (s.index === index) {
+          return { ...s, operator: null };
         }
-        return prev;
-      }
-      
-      // 활성화된 툴이 있을 때:
-      // 이미 같은 연산자가 있다면 토글(삭제)
-      if (existingOperator === activeToolOperator) {
-        const newSlots = prev.operatorSlots.map(s => s.index === index ? { ...s, operator: null } : s);
-        return { ...prev, operatorSlots: newSlots, selection: { type: 'none' } };
-      }
-      
-      // 다른 연산자이거나 빈 칸이면 덮어쓰기/삽입
-      const newSlots = prev.operatorSlots.map(s => s.index === index ? { ...s, operator: activeToolOperator } : s);
-      return { ...prev, operatorSlots: newSlots, selection: { type: 'none' } };
+        return s;
+      });
+      return {
+        ...prev,
+        operatorSlots: newSlots,
+        selection: { type: 'none' },
+      };
+    });
+  };
+
+  const handleOperatorDrop = (index: number, op: InlineOperator) => {
+    if (gameState.status !== 'playing') return;
+    setWarningMessage('');
+    setGameState(prev => {
+      const newSlots = prev.operatorSlots.map(s => {
+        if (s.index === index) {
+          return { ...s, operator: op };
+        }
+        return s;
+      });
+
+      return {
+        ...prev,
+        operatorSlots: newSlots,
+        selection: { type: 'none' },
+      };
     });
 
     setLastChangedSlotIndex(index);
     setTimeout(() => {
       setLastChangedSlotIndex(prev => prev === index ? null : prev);
     }, 300);
+  };
+
+  const handleDragStart = (event: any) => {
+    setActiveDragOperator(event.active.data.current?.operator || null);
+    setWarningMessage('');
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragOperator(null);
+    const { active, over } = event;
+    if (over && over.data.current) {
+      const slotIndex = over.data.current.index;
+      const op = active.data.current?.operator as InlineOperator;
+      if (op && slotIndex !== undefined) {
+        handleOperatorDrop(slotIndex, op);
+      }
+    }
   };
 
   const handleResetClick = () => {
@@ -289,42 +317,46 @@ export default function SoloGamePage() {
             <DifficultySelector onSelect={startNewPuzzle} />
           ) : (
             <>
-              {/* Main Numbering Workspace Editor */}
-              <NumberingEditor
-                difficulty={gameState.difficulty}
-                digits={gameState.digits}
-                operatorSlots={gameState.operatorSlots}
-                parentheses={gameState.parentheses}
-                selection={gameState.selection}
-                lastChangedSlotIndex={lastChangedSlotIndex}
-                onDigitPointerDown={handleDigitPointerDown}
-                onDigitPointerEnter={handleDigitPointerEnter}
-                onDigitPointerUp={handleDigitPointerUp}
-                onParenthesisClick={handleDeleteParenthesis}
-                onSelectSlot={handleSelectSlot}
-                activeToolOperator={activeToolOperator}
-              />
-
-              {/* 
-                Unified Equation Preview was removed per user request.
-                If any validation messages exist, they could still be shown, 
-                but for now we omit the entire block to keep the UI clean.
-              */}
-              {displayMessage && (
-                <div className="mt-4 min-h-[24px] text-center text-sm font-medium text-red-500">
-                  {displayMessage}
-                </div>
-              )}
-
-              <div className="mb-4 flex flex-col items-center justify-center">
-                <OperatorToolbar 
-                  activeOperator={activeToolOperator} 
-                  onSelectOperator={(op) => {
-                    setActiveToolOperator(prev => prev === op ? null : op);
-                    setWarningMessage('');
-                  }} 
+              <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                {/* Main Numbering Workspace Editor */}
+                <NumberingEditor
+                  difficulty={gameState.difficulty}
+                  digits={gameState.digits}
+                  operatorSlots={gameState.operatorSlots}
+                  parentheses={gameState.parentheses}
+                  selection={gameState.selection}
+                  lastChangedSlotIndex={lastChangedSlotIndex}
+                  onDigitPointerDown={handleDigitPointerDown}
+                  onDigitPointerEnter={handleDigitPointerEnter}
+                  onDigitPointerUp={handleDigitPointerUp}
+                  onParenthesisClick={handleDeleteParenthesis}
+                  onSelectSlot={handleSelectSlot}
+                  onOperatorDrop={handleOperatorDrop}
                 />
-              </div>
+
+                {/* 
+                  Unified Equation Preview was removed per user request.
+                  If any validation messages exist, they could still be shown, 
+                  but for now we omit the entire block to keep the UI clean.
+                */}
+                {displayMessage && (
+                  <div className="mt-4 min-h-[24px] text-center text-sm font-medium text-red-500">
+                    {displayMessage}
+                  </div>
+                )}
+
+                <div className="mb-4 flex flex-col items-center justify-center">
+                  <DraggableOperatorBar />
+                </div>
+                
+                <DragOverlay dropAnimation={null}>
+                  {activeDragOperator ? (
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-xl text-3xl font-light text-gray-800 border border-gray-100 scale-110 touch-none">
+                      {activeDragOperator}
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
 
               {/* Bottom Gameplay Actions */}
               <BottomGameActions
