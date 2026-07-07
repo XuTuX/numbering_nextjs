@@ -30,10 +30,8 @@ export default function RoomPage() {
     const socket = getSocket();
     setSocketId(socket.id || '');
 
-    // The user should have joined from the previous page, but if they reload, they need to re-join
-    if (!socket.connected) {
+    const handleJoin = () => {
       const username = localStorage.getItem('numbering_username') || 'Player';
-      socket.connect();
       socket.emit('join_room', { roomId, username }, (res: any) => {
         if (!res.success) {
           alert(res.message);
@@ -44,6 +42,17 @@ export default function RoomPage() {
           setIsHost(res.room.hostId === socket.id);
         }
       });
+    };
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+    
+    // Always join/sync room on mount
+    if (socket.id) {
+      handleJoin();
+    } else {
+      socket.on('connect', handleJoin);
     }
 
     socket.on('player_joined', (updatedPlayers: Record<string, Player>) => setPlayers(updatedPlayers));
@@ -76,6 +85,7 @@ export default function RoomPage() {
     });
 
     return () => {
+      socket.off('connect', handleJoin);
       socket.off('player_joined');
       socket.off('player_left');
       socket.off('host_changed');
