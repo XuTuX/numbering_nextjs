@@ -18,7 +18,7 @@ export default function PlayModeSelection({
 }: PlayModeSelectionProps) {
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col items-center justify-center px-4 py-12 font-sans selection:bg-gray-200">
-      <div className="absolute top-8 left-8">
+      <div className="absolute left-1/2 top-8 z-20 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 md:top-12 md:w-[calc(100%-4rem)]">
         <Link href="/" className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm font-medium">
           ← 게임 모드
         </Link>

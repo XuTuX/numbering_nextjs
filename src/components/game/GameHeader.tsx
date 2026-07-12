@@ -17,7 +17,7 @@ export default function GameHeader({
     <header className="flex justify-between items-center w-full mb-12">
       <div className="w-20">
         <Link href={backHref} className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm font-medium">
-          ← Back
+          ← 게임 모드
         </Link>
       </div>
       <div className="flex flex-col items-center">
