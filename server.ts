@@ -42,6 +42,9 @@ app.prepare().then(() => {
     try {
       if (!req.url) throw new Error('No url');
       const parsedUrl = parse(req.url, true);
+      if (parsedUrl.pathname && parsedUrl.pathname.startsWith('/socket.io/')) {
+        return; // socket.io will handle it
+      }
       handle(req, res, parsedUrl);
     } catch (err) {
       console.error('Error occurred handling', req?.url, err);
@@ -175,8 +178,13 @@ app.prepare().then(() => {
       room.foundEquations[socket.id] = [];
       socket.join(roomId);
       
+      if (!room.players[room.hostId]) {
+        room.hostId = socket.id;
+      }
+      
       callback({ success: true, room });
       io.to(roomId).emit('player_joined', room.players);
+      io.to(roomId).emit('host_changed', room.hostId);
       console.log(`${username} joined room ${roomId}`);
     });
 
@@ -209,6 +217,34 @@ app.prepare().then(() => {
       } else {
         const msg = !validation.valid ? validation.message : '올바르지 않은 수식입니다.';
         callback({ success: false, message: msg });
+      }
+    });
+
+    socket.on('leave_room', ({ roomId }) => {
+      const room = rooms.get(roomId);
+      if (room && room.players[socket.id]) {
+        delete room.players[socket.id];
+        socket.leave(roomId);
+        io.to(roomId).emit('player_left', room.players);
+        
+        if (room.hostId === socket.id) {
+          const firstConnected = Object.values(room.players).find(p => p.connected);
+          if (firstConnected) {
+            room.hostId = firstConnected.socketId;
+            io.to(roomId).emit('host_changed', room.hostId);
+          }
+        }
+        
+        // Delay deletion to prevent React Strict Mode unmount bugs
+        setTimeout(() => {
+          const currentRoom = rooms.get(roomId);
+          if (currentRoom) {
+            const anyConnected = Object.values(currentRoom.players).some(p => p.connected);
+            if (!anyConnected && Object.keys(currentRoom.players).length === 0) {
+              rooms.delete(roomId);
+            }
+          }
+        }, 2000);
       }
     });
 

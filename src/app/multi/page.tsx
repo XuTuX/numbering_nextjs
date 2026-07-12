@@ -56,7 +56,7 @@ export default function MultiGamePage() {
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col items-center justify-center px-4 md:px-8 py-8 font-sans selection:bg-gray-200">
       <div className="absolute top-8 left-8">
-        <Link href="/" className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm font-medium">
+        <Link href="/games/formula-workshop" className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm font-medium">
           ← Back
         </Link>
       </div>

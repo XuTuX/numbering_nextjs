@@ -31,6 +31,7 @@ export default function RoomPage() {
     setSocketId(socket.id || '');
 
     const handleJoin = () => {
+      setSocketId(socket.id || '');
       const username = localStorage.getItem('numbering_username') || 'Player';
       socket.emit('join_room', { roomId, username }, (res: any) => {
         if (!res.success) {
@@ -94,6 +95,7 @@ export default function RoomPage() {
       socket.off('score_updated');
       socket.off('round_ended');
       socket.off('game_ended');
+      socket.emit('leave_room', { roomId });
     };
   }, [roomId, router]);
 

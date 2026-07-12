@@ -317,7 +317,7 @@ export default function SoloGamePage() {
     >
       <div className="w-full max-w-3xl flex flex-col flex-grow">
         <SoloGameHeader
-          mode="SOLO"
+          mode="수식 공방 · SOLO"
           stage={gameState.difficulty}
           timer={gameState.status === 'idle' ? '00:00' : formatTimer(timer)}
         />
