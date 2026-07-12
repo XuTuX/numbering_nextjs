@@ -1,13 +1,13 @@
 import Link from 'next/link';
 
-interface HomeModeCardProps {
+interface GameModeCardProps {
   title: string;
   description: string;
   href: string;
   label?: string;
 }
 
-export default function HomeModeCard({ title, description, href, label }: HomeModeCardProps) {
+export default function GameModeCard({ title, description, href, label }: GameModeCardProps) {
   return (
     <Link 
       href={href}

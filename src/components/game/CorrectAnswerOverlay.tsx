@@ -1,13 +1,11 @@
-import { GeneratedPuzzle } from '@/lib/puzzleTypes';
 import { useEffect } from 'react';
 
-interface PuzzleResultModalProps {
+interface CorrectAnswerOverlayProps {
   status: 'correct' | 'wrong';
-  puzzle: GeneratedPuzzle | null;
   onNext: () => void;
 }
 
-export default function PuzzleResultModal({ status, puzzle, onNext }: PuzzleResultModalProps) {
+export default function CorrectAnswerOverlay({ status, onNext }: CorrectAnswerOverlayProps) {
   useEffect(() => {
     if (status === 'correct') {
       const timer = setTimeout(() => {

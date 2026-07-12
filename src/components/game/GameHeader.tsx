@@ -4,13 +4,19 @@ interface GameHeaderProps {
   mode: string;
   stage: string;
   timer: string;
+  backHref?: string;
 }
 
-export default function GameHeader({ mode, stage, timer }: GameHeaderProps) {
+export default function GameHeader({
+  mode,
+  stage,
+  timer,
+  backHref = '/games/formula-workshop',
+}: GameHeaderProps) {
   return (
     <header className="flex justify-between items-center w-full mb-12">
       <div className="w-20">
-        <Link href="/games/formula-workshop" className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm font-medium">
+        <Link href={backHref} className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm font-medium">
           ← Back
         </Link>
       </div>

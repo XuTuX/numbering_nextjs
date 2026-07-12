@@ -3,15 +3,13 @@
 import React from 'react';
 import {
   EditorSelection,
+  InlineOperator,
   OperatorSlot,
   ParenthesisRange,
-  InlineOperator,
-} from '@/types/game';
-import { PuzzleDifficulty } from '@/lib/puzzleTypes';
+} from '@/lib/equation/types';
 import { useDroppable, useDndContext } from '@dnd-kit/core';
 
-interface NumberingEditorProps {
-  difficulty: PuzzleDifficulty;
+interface EquationEditorProps {
   digits: string[];
   operatorSlots: OperatorSlot[];
   parentheses: ParenthesisRange[];
@@ -22,11 +20,9 @@ interface NumberingEditorProps {
   onDigitPointerUp: () => void;
   onParenthesisClick?: (id: string) => void;
   onSelectSlot: (index: number) => void;
-  onOperatorDrop: (index: number, operator: InlineOperator) => void;
 }
 
-export default function NumberingEditor({
-  difficulty,
+export default function EquationEditor({
   digits,
   operatorSlots,
   parentheses,
@@ -37,8 +33,7 @@ export default function NumberingEditor({
   onDigitPointerUp,
   onParenthesisClick,
   onSelectSlot,
-  onOperatorDrop,
-}: NumberingEditorProps) {
+}: EquationEditorProps) {
 
 
 

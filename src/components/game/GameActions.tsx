@@ -1,22 +1,16 @@
 'use client';
 
-import { PuzzleDifficulty } from '@/lib/puzzleTypes';
-
-interface BottomGameActionsProps {
-  difficulty: PuzzleDifficulty;
+interface GameActionsProps {
   hintCount: number;
   onHintClick: () => void;
   onResetClick: () => void;
 }
 
-export default function BottomGameActions({
-  difficulty,
+export default function GameActions({
   hintCount,
   onHintClick,
   onResetClick,
-}: BottomGameActionsProps) {
-  const isHard = difficulty === 'HARD';
-
+}: GameActionsProps) {
   return (
     <div
       className="mx-auto mt-6 w-full max-w-lg px-2"

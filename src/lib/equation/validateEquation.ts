@@ -1,5 +1,5 @@
-import { ValidationResult } from './puzzleTypes';
-import { evaluateExpression } from './expressionParser';
+import { ValidationResult } from '@/lib/equation/types';
+import { evaluateExpression } from '@/lib/equation/evaluateExpression';
 
 export function validateEquation(expression: string, originalDigitsString: string): ValidationResult {
   const strippedDigits = expression.replace(/[^0-9]/g, '');

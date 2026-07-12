@@ -1,5 +1,5 @@
-import { GeneratedPuzzle, PuzzleDifficulty, OperatorToken } from './puzzleTypes';
-import { validateEquation } from './expressionValidator';
+import { GeneratedPuzzle, PuzzleDifficulty, OperatorToken } from '@/features/formula-workshop/types';
+import { validateEquation } from '@/lib/equation/validateEquation';
 
 type PuzzleCandidate = {
   expr: string;

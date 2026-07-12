@@ -1,9 +1,13 @@
-import { connection } from 'next/server';
-import NumberVaultGame from '@/components/NumberVaultGame';
-import { createNumberVaultPuzzle } from '@/lib/numberVaultPuzzle';
+import PlayModeSelection from '@/components/game/PlayModeSelection';
 
-export default async function NumberVaultPage() {
-  await connection();
-
-  return <NumberVaultGame initialPuzzle={createNumberVaultPuzzle()} />;
+export default function NumberVaultPage() {
+  return (
+    <PlayModeSelection
+      gameNumber="GAME 03"
+      title="숫자 금고"
+      description="플레이 방식을 선택하세요."
+      soloHref="/games/number-vault/solo"
+      multiHref="/multi?mode=number-vault"
+    />
+  );
 }

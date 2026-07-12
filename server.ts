@@ -2,8 +2,20 @@ import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
 import { Server, Socket } from 'socket.io';
-import { generatePuzzle } from './src/lib/puzzleGenerator';
-import { validateEquation } from './src/lib/expressionValidator';
+import { generatePuzzle } from './src/features/formula-workshop/lib/generatePuzzle';
+import { validateEquation } from './src/lib/equation/validateEquation';
+import { evaluateExpression } from './src/lib/equation/evaluateExpression';
+import { createNumberVaultPuzzle } from './src/features/number-vault/lib/createPuzzle';
+import { createSequencePuzzle } from './src/features/sequence-detective/lib/createPuzzle';
+import { getDifficultyForRound } from './src/features/formula-workshop/types';
+import {
+  GameMode,
+  MULTIPLAYER_ROUNDS,
+  MultiplayerPuzzle,
+  normalizeGameMode,
+  Player,
+  RoomStatus,
+} from './src/features/multiplayer/types';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -12,30 +24,24 @@ const port = parseInt(process.env.PORT || '3001', 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-interface Player {
-  socketId: string;
-  username: string;
-  score: number;
-  connected: boolean;
-}
-
 interface Room {
   roomId: string;
   hostId: string;
-  status: 'LOBBY' | 'PLAYING' | 'ROUND_END' | 'GAME_END';
+  status: RoomStatus;
   round: number;
   timer: number;
-  digits: string[];
-  digitString: string;
+  gameMode: GameMode;
+  puzzle: MultiplayerPuzzle | null;
+  sequenceAnswer: { first: number; second: number } | null;
   players: Record<string, Player>;
   foundEquations: Record<string, string[]>; // socketId -> array of string
+  solvedPlayers: Record<string, boolean>;
 }
 
 const rooms = new Map<string, Room>();
 
 const ROUND_TIME = 180; // 3 minutes
 const BREAK_TIME = 10;  // 10 seconds break
-const MAX_ROUNDS = 3;
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
@@ -63,21 +69,40 @@ app.prepare().then(() => {
 
     room.status = 'PLAYING';
     room.timer = ROUND_TIME;
-    // Generate a puzzle. Use HARD for more digits (7-10 digits) which allows more combinations.
-    const puzzle = generatePuzzle('HARD');
-    room.digits = puzzle.digits;
-    room.digitString = puzzle.digitString;
+    const progressionRound = room.round === 1 ? 1 : room.round === 2 ? 3 : 7;
+
+    if (room.gameMode === 'sequence-detective') {
+      const puzzle = createSequencePuzzle(progressionRound);
+      room.puzzle = {
+        mode: 'sequence-detective',
+        target: puzzle.target,
+        termCount: puzzle.termCount,
+      };
+      room.sequenceAnswer = { first: puzzle.first, second: puzzle.second };
+    } else if (room.gameMode === 'number-vault') {
+      const puzzle = createNumberVaultPuzzle(progressionRound);
+      room.puzzle = { mode: 'number-vault', numbers: puzzle.numbers, target: puzzle.target };
+      room.sequenceAnswer = null;
+    } else {
+      const puzzle = generatePuzzle(getDifficultyForRound(progressionRound));
+      room.puzzle = {
+        mode: 'formula-workshop',
+        digits: puzzle.digits,
+        digitString: puzzle.digitString,
+      };
+      room.sequenceAnswer = null;
+    }
 
     // Reset found equations for this round
     Object.keys(room.foundEquations).forEach(id => {
       room.foundEquations[id] = [];
     });
+    room.solvedPlayers = {};
 
     io.to(roomId).emit('round_started', {
       round: room.round,
       timer: room.timer,
-      digits: room.digits,
-      digitString: room.digitString,
+      puzzle: room.puzzle,
       status: room.status
     });
   }
@@ -122,7 +147,7 @@ app.prepare().then(() => {
       } else if (room.status === 'ROUND_END') {
         room.timer -= 1;
         if (room.timer <= 0) {
-          if (room.round < MAX_ROUNDS) {
+          if (room.round < MULTIPLAYER_ROUNDS) {
             room.round += 1;
             startRound(roomId);
           } else {
@@ -138,7 +163,7 @@ app.prepare().then(() => {
   io.on('connection', (socket: Socket) => {
     console.log('Client connected:', socket.id);
 
-    socket.on('create_room', ({ username }, callback) => {
+    socket.on('create_room', ({ username, gameMode }, callback) => {
       const roomId = Math.random().toString(36).substring(2, 6).toUpperCase();
       const newRoom: Room = {
         roomId,
@@ -146,10 +171,12 @@ app.prepare().then(() => {
         status: 'LOBBY',
         round: 1,
         timer: 0,
-        digits: [],
-        digitString: '',
+        gameMode: normalizeGameMode(gameMode),
+        puzzle: null,
+        sequenceAnswer: null,
         players: {},
-        foundEquations: {}
+        foundEquations: {},
+        solvedPlayers: {},
       };
       
       newRoom.players[socket.id] = { socketId: socket.id, username, score: 0, connected: true };
@@ -198,6 +225,7 @@ app.prepare().then(() => {
     socket.on('submit_equation', ({ roomId, expression }, callback) => {
       const room = rooms.get(roomId);
       if (!room || room.status !== 'PLAYING') return callback({ success: false, message: '게임 진행중이 아닙니다.' });
+      if (room.puzzle?.mode !== 'formula-workshop') return callback({ success: false, message: '수식 공방 문제가 아닙니다.' });
 
       // Clean up whitespace
       const expr = expression.replace(/\s+/g, '');
@@ -206,7 +234,7 @@ app.prepare().then(() => {
         return callback({ success: false, message: '이미 찾은 수식입니다.' });
       }
 
-      const validation = validateEquation(expression, room.digitString);
+      const validation = validateEquation(expression, room.puzzle.digitString);
       if (validation.valid && validation.isCorrect) {
         foundList.push(expr);
         if (room.players[socket.id]) {
@@ -218,6 +246,50 @@ app.prepare().then(() => {
         const msg = !validation.valid ? validation.message : '올바르지 않은 수식입니다.';
         callback({ success: false, message: msg });
       }
+    });
+
+    socket.on('submit_sequence', ({ roomId, first, second }, callback) => {
+      const room = rooms.get(roomId);
+      if (!room || room.status !== 'PLAYING' || room.puzzle?.mode !== 'sequence-detective') {
+        return callback({ success: false, message: '수열 탐정 게임이 진행 중이 아닙니다.' });
+      }
+      if (room.solvedPlayers[socket.id]) {
+        return callback({ success: false, message: '이번 라운드는 이미 해결했습니다.' });
+      }
+      const correct = room.sequenceAnswer?.first === first && room.sequenceAnswer?.second === second;
+      if (!correct) return callback({ success: false, message: '정답이 아닙니다.' });
+
+      room.solvedPlayers[socket.id] = true;
+      if (room.players[socket.id]) room.players[socket.id].score += 1;
+      io.to(roomId).emit('score_updated', { players: room.players });
+      callback({ success: true });
+    });
+
+    socket.on('submit_vault', ({ roomId, expression }, callback) => {
+      const room = rooms.get(roomId);
+      if (!room || room.status !== 'PLAYING' || room.puzzle?.mode !== 'number-vault') {
+        return callback({ success: false, message: '숫자 금고 게임이 진행 중이 아닙니다.' });
+      }
+      if (room.solvedPlayers[socket.id]) {
+        return callback({ success: false, message: '이번 라운드는 이미 해결했습니다.' });
+      }
+
+      const usedNumbers = (String(expression).match(/\d+/g) ?? [])
+        .map((value) => Number(value))
+        .sort((a: number, b: number) => a - b);
+      const expectedNumbers = [...room.puzzle.numbers].sort((a, b) => a - b);
+      if (JSON.stringify(usedNumbers) !== JSON.stringify(expectedNumbers)) {
+        return callback({ success: false, message: '모든 숫자를 정확히 한 번씩 사용해야 합니다.' });
+      }
+      const result = evaluateExpression(expression);
+      if (!result.valid || result.value !== room.puzzle.target) {
+        return callback({ success: false, message: result.valid ? '목표 숫자와 값이 다릅니다.' : result.message });
+      }
+
+      room.solvedPlayers[socket.id] = true;
+      if (room.players[socket.id]) room.players[socket.id].score += 1;
+      io.to(roomId).emit('score_updated', { players: room.players });
+      callback({ success: true });
     });
 
     socket.on('leave_room', ({ roomId }) => {

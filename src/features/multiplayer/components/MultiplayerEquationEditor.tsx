@@ -1,41 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { InlineOperator, OperatorSlot } from '@/types/game';
-import { getSocket } from '@/lib/socketClient';
-import { buildExpression } from '@/lib/expression';
-import NumberingEditor from './NumberingEditor';
-import DraggableOperatorBar from './DraggableOperatorBar';
-import { DndContext, DragEndEvent, DragOverlay, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
-import { EditorSelection, ParenthesisRange } from '@/types/game';
+import { useState } from 'react';
+import { InlineOperator, OperatorSlot } from '@/lib/equation/types';
+import { getSocket } from '@/features/multiplayer/lib/socket';
+import { buildExpression } from '@/lib/equation/buildExpression';
+import EquationEditor from '@/components/game/EquationEditor';
+import OperatorPalette from '@/components/game/OperatorPalette';
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
+import { EditorSelection, ParenthesisRange } from '@/lib/equation/types';
+import { SubmissionResponse } from '@/features/multiplayer/types';
+import { createOperatorSlots, createParenthesisRange } from '@/lib/equation/editorState';
 
-interface MultiNumberingEditorProps {
+interface MultiplayerEquationEditorProps {
   digits: string[];
-  digitString: string;
   roomId: string;
 }
 
-export default function MultiNumberingEditor({ digits, digitString, roomId }: MultiNumberingEditorProps) {
-  const [operatorSlots, setOperatorSlots] = useState<OperatorSlot[]>([]);
+export default function MultiplayerEquationEditor({ digits, roomId }: MultiplayerEquationEditorProps) {
+  const [operatorSlots, setOperatorSlots] = useState<OperatorSlot[]>(() =>
+    createOperatorSlots(digits.length),
+  );
   const [parentheses, setParentheses] = useState<ParenthesisRange[]>([]);
   const [selection, setSelection] = useState<EditorSelection>({ type: 'none' });
   const [activeDragOperator, setActiveDragOperator] = useState<InlineOperator | null>(null);
   const [lastChangedSlotIndex, setLastChangedSlotIndex] = useState<number | null>(null);
   const [foundEquations, setFoundEquations] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<{ message: string; isError: boolean } | null>(null);
-
-  useEffect(() => {
-    // Reset slots when digits change (new round)
-    const initialSlots = Array.from({ length: digits.length - 1 }).map((_, i) => ({
-      index: i,
-      operator: null,
-    }));
-    setOperatorSlots(initialSlots);
-    setParentheses([]);
-    setSelection({ type: 'none' });
-    setFoundEquations([]);
-    setFeedback(null);
-  }, [digits]);
 
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } });
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } });
@@ -48,7 +38,7 @@ export default function MultiNumberingEditor({ digits, digitString, roomId }: Mu
     setLastChangedSlotIndex(index);
   };
 
-  const handleDragStart = (event: any) => {
+  const handleDragStart = (event: DragStartEvent) => {
     setActiveDragOperator(event.active.data.current?.operator || null);
     setFeedback(null);
   };
@@ -84,36 +74,14 @@ export default function MultiNumberingEditor({ digits, digitString, roomId }: Mu
       return;
     }
 
-    const start = Math.min(startDigitIndex, endDigitIndex);
-    const end = Math.max(startDigitIndex, endDigitIndex);
-
-    const exactDuplicate = parentheses.some(
-      p => p.startDigitIndex === start && p.endDigitIndex === end
-    );
-    if (exactDuplicate) {
-      setFeedback({ message: '이미 동일한 범위가 괄호로 묶여 있습니다.', isError: true });
+    const result = createParenthesisRange(startDigitIndex, endDigitIndex, parentheses);
+    if (!result.valid) {
+      setFeedback({ message: result.message, isError: true });
       setSelection({ type: 'none' });
       return;
     }
 
-    const crossing = parentheses.some(p => {
-      const A = p.startDigitIndex;
-      const B = p.endDigitIndex;
-      return (start < A && A < end && end < B) || (A < start && start < B && B < end);
-    });
-    if (crossing) {
-      setFeedback({ message: '괄호 범위가 서로 교차할 수 없습니다.', isError: true });
-      setSelection({ type: 'none' });
-      return;
-    }
-
-    const newParenthesis = {
-      id: Math.random().toString(36).substring(2, 9),
-      startDigitIndex: start,
-      endDigitIndex: end,
-    };
-
-    setParentheses([...parentheses, newParenthesis]);
+    setParentheses([...parentheses, result.range]);
     setSelection({ type: 'none' });
   };
 
@@ -135,7 +103,7 @@ export default function MultiNumberingEditor({ digits, digitString, roomId }: Mu
     setOperatorSlots(resetSlots);
     setParentheses([]);
 
-    getSocket().emit('submit_equation', { roomId, expression: currentExpression }, (res: any) => {
+    getSocket().emit('submit_equation', { roomId, expression: currentExpression }, (res: SubmissionResponse) => {
       if (res.success) {
         setFoundEquations(prev => [currentExpression, ...prev]);
         setFeedback({ message: '정답입니다! 1점 획득 🎉', isError: false });
@@ -149,8 +117,7 @@ export default function MultiNumberingEditor({ digits, digitString, roomId }: Mu
     <div className="w-full flex flex-col items-center max-w-3xl mx-auto" onClick={handleClearSelection}>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="mb-10 w-full flex justify-center">
-          <NumberingEditor
-            difficulty="HARD"
+          <EquationEditor
             digits={digits}
             operatorSlots={operatorSlots}
             parentheses={parentheses}
@@ -164,12 +131,11 @@ export default function MultiNumberingEditor({ digits, digitString, roomId }: Mu
               // Click to clear
               setOperatorSlots(prev => prev.map(s => s.index === index ? { ...s, operator: null } : s));
             }}
-            onOperatorDrop={handleOperatorDrop}
           />
         </div>
 
         <div className="mb-10 flex flex-col items-center justify-center">
-          <DraggableOperatorBar />
+          <OperatorPalette />
         </div>
 
         <DragOverlay dropAnimation={null}>

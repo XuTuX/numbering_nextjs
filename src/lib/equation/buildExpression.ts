@@ -1,4 +1,4 @@
-import { OperatorSlot, ParenthesisRange } from '@/types/game';
+import { OperatorSlot, ParenthesisRange } from '@/lib/equation/types';
 
 export function buildExpression(
   digits: string[],

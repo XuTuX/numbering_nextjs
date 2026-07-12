@@ -1,4 +1,4 @@
-import HomeModeCard from '@/components/HomeModeCard';
+import GameModeCard from '@/components/home/GameModeCard';
 
 export default function HomePage() {
   return (
@@ -12,19 +12,19 @@ export default function HomePage() {
         </p>
 
         <div className="flex flex-col md:flex-row md:flex-wrap gap-6 md:gap-8 w-full max-w-5xl justify-center items-stretch">
-          <HomeModeCard
+          <GameModeCard
             label="GAME 01"
             title="수식 공방"
             description="주어진 숫자 사이에 기호를 조립해 완벽한 수식을 만들어 보세요."
             href="/games/formula-workshop"
           />
-          <HomeModeCard
+          <GameModeCard
             label="GAME 02"
             title="수열 탐정"
             description="마지막 숫자를 단서로 수열을 거슬러 올라가 첫 두 숫자를 찾아내세요."
             href="/games/sequence-detective"
           />
-          <HomeModeCard
+          <GameModeCard
             label="GAME 03"
             title="숫자 금고"
             description="숫자 카드를 원하는 순서로 조합해 금고의 목표 숫자를 만들어 보세요."

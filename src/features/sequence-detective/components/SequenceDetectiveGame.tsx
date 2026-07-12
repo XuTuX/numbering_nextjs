@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
-import { createSequencePuzzle, SequencePuzzle } from '@/lib/sequencePuzzle';
+import { createSequencePuzzle, SequencePuzzle } from '@/features/sequence-detective/lib/createPuzzle';
 
 type Result = 'playing' | 'correct' | 'wrong';
 
@@ -12,6 +12,7 @@ interface SequenceDetectiveGameProps {
 
 export default function SequenceDetectiveGame({ initialPuzzle }: SequenceDetectiveGameProps) {
   const [puzzle, setPuzzle] = useState(initialPuzzle);
+  const [round, setRound] = useState(1);
   const [firstGuess, setFirstGuess] = useState('');
   const [secondGuess, setSecondGuess] = useState('');
   const [result, setResult] = useState<Result>('playing');
@@ -19,7 +20,9 @@ export default function SequenceDetectiveGame({ initialPuzzle }: SequenceDetecti
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const startNextPuzzle = () => {
-    setPuzzle(createSequencePuzzle());
+    const nextRound = round + 1;
+    setRound(nextRound);
+    setPuzzle(createSequencePuzzle(nextRound));
     setFirstGuess('');
     setSecondGuess('');
     setResult('playing');
@@ -44,14 +47,14 @@ export default function SequenceDetectiveGame({ initialPuzzle }: SequenceDetecti
     <div className="min-h-[100dvh] bg-[#FAFAFA] px-4 py-8 font-sans selection:bg-gray-200 md:px-8 md:py-12">
       <header className="mx-auto grid w-full max-w-3xl grid-cols-3 items-center">
         <Link
-          href="/"
+          href="/games/sequence-detective"
           className="justify-self-start text-sm font-medium text-[#8A8A8A] transition-colors hover:text-[#111111]"
         >
           ← 게임 모드
         </Link>
         <div className="text-center">
           <h1 className="whitespace-nowrap text-xl font-semibold tracking-wide text-[#111111]">수열 탐정</h1>
-          <span className="mt-1 block text-xs text-[#8A8A8A]">GAME 02</span>
+          <span className="mt-1 block text-xs text-[#8A8A8A]">ROUND {round}</span>
         </div>
         <button
           type="button"
