@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getSocket } from '@/features/multiplayer/lib/socket';
+import { emitWithAck, getPlayerId, getSocket } from '@/features/multiplayer/lib/socket';
 import Link from 'next/link';
 import MultiplayerEquationEditor from '@/features/multiplayer/components/MultiplayerEquationEditor';
 import {
@@ -20,6 +20,8 @@ import {
 import MultiplayerSequenceRound from '@/features/multiplayer/components/MultiplayerSequenceRound';
 import MultiplayerNumberVaultRound from '@/features/multiplayer/components/MultiplayerNumberVaultRound';
 
+const pendingLeaveTimers = new Map<string, number>();
+
 export default function MultiplayerRoom() {
   const { roomId } = useParams() as { roomId: string };
   const router = useRouter();
@@ -30,16 +32,24 @@ export default function MultiplayerRoom() {
   const [timer, setTimer] = useState(0);
   const [gameMode, setGameMode] = useState<GameMode>('formula-workshop');
   const [puzzle, setPuzzle] = useState<MultiplayerPuzzle | null>(null);
-  const [isHost, setIsHost] = useState(false);
+  const [hostId, setHostId] = useState('');
   const [socketId, setSocketId] = useState('');
 
   useEffect(() => {
     const socket = getSocket();
+    let cancelled = false;
+    const pendingLeave = pendingLeaveTimers.get(roomId);
+    if (pendingLeave !== undefined) {
+      window.clearTimeout(pendingLeave);
+      pendingLeaveTimers.delete(roomId);
+    }
 
-    const handleJoin = () => {
+    const handleJoin = async () => {
       setSocketId(socket.id || '');
       const username = localStorage.getItem('numbering_username') || 'Player';
-      socket.emit('join_room', { roomId, username }, (res: RoomResponse) => {
+      try {
+        const res = await emitWithAck<RoomResponse>('join_room', { roomId, username, playerId: getPlayerId() });
+        if (cancelled) return;
         if (!res.success) {
           alert(res.message);
           router.push('/multi');
@@ -47,9 +57,14 @@ export default function MultiplayerRoom() {
           setPlayers(res.room.players);
           setStatus(res.room.status);
           setGameMode(res.room.gameMode);
-          setIsHost(res.room.hostId === socket.id);
+          setRound(res.room.round);
+          setTimer(res.room.timer);
+          setPuzzle(res.room.puzzle);
+          setHostId(res.room.hostId);
         }
-      });
+      } catch {
+        if (!cancelled) alert('서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.');
+      }
     };
 
     if (!socket.connected) {
@@ -65,7 +80,7 @@ export default function MultiplayerRoom() {
 
     socket.on('player_joined', (updatedPlayers: Record<string, Player>) => setPlayers(updatedPlayers));
     socket.on('player_left', (updatedPlayers: Record<string, Player>) => setPlayers(updatedPlayers));
-    socket.on('host_changed', (newHostId: string) => setIsHost(newHostId === socket.id));
+    socket.on('host_changed', setHostId);
 
     socket.on('round_started', (data: RoundStartedPayload) => {
       setStatus(data.status);
@@ -92,6 +107,7 @@ export default function MultiplayerRoom() {
     });
 
     return () => {
+      cancelled = true;
       socket.off('connect', handleJoin);
       socket.off('player_joined');
       socket.off('player_left');
@@ -101,9 +117,20 @@ export default function MultiplayerRoom() {
       socket.off('score_updated');
       socket.off('round_ended');
       socket.off('game_ended');
-      socket.emit('leave_room', { roomId });
+      const leaveTimer = window.setTimeout(() => {
+        socket.emit('leave_room', { roomId });
+        pendingLeaveTimers.delete(roomId);
+      }, 250);
+      pendingLeaveTimers.set(roomId, leaveTimer);
     };
   }, [roomId, router]);
+
+  const leaveRoom = () => {
+    const pendingLeave = pendingLeaveTimers.get(roomId);
+    if (pendingLeave !== undefined) window.clearTimeout(pendingLeave);
+    pendingLeaveTimers.delete(roomId);
+    getSocket().emit('leave_room', { roomId });
+  };
 
   const handleStartGame = () => {
     getSocket().emit('start_game', { roomId });
@@ -118,12 +145,13 @@ export default function MultiplayerRoom() {
   const sortedPlayers = Object.values(players)
     .filter(p => p.connected)
     .sort((a, b) => b.score - a.score);
+  const isHost = hostId === socketId;
 
   if (status === 'LOBBY') {
     return (
       <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col items-center justify-center p-4">
         <div className="absolute top-8 left-8">
-          <Link href={`/multi?mode=${gameMode}`} className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm">
+          <Link onClick={leaveRoom} href={`/multi?mode=${gameMode}`} className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm">
             ← Leave
           </Link>
         </div>
@@ -137,7 +165,7 @@ export default function MultiplayerRoom() {
             {sortedPlayers.map((p) => (
               <div key={p.socketId} className="flex items-center justify-between px-5 py-4 rounded-2xl bg-[#FAFAFA] border border-[#EAEAEA]">
                 <span className="font-medium text-[#111111]">{p.username} {p.socketId === socketId ? '(나)' : ''}</span>
-                {isHost && p.socketId === socketId && <span className="text-xs bg-[#111111] text-white px-2 py-1 rounded-md">HOST</span>}
+                {p.socketId === hostId && <span className="text-xs bg-[#111111] text-white px-2 py-1 rounded-md">HOST</span>}
               </div>
             ))}
             {sortedPlayers.length === 0 && <div className="text-center text-[#A0A0A0] text-sm py-4">로딩중...</div>}
@@ -200,7 +228,7 @@ export default function MultiplayerRoom() {
             ))}
           </div>
 
-          <Link href={`/multi?mode=${gameMode}`} className="w-full py-4 rounded-2xl bg-white text-[#111111] text-center font-medium hover:bg-[#FAFAFA] transition-colors active:scale-[0.98]">
+          <Link onClick={leaveRoom} href={`/multi?mode=${gameMode}`} className="w-full py-4 rounded-2xl bg-white text-[#111111] text-center font-medium hover:bg-[#FAFAFA] transition-colors active:scale-[0.98]">
             로비로 돌아가기
           </Link>
         </div>

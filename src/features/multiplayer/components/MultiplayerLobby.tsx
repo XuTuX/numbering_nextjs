@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSocket } from '@/features/multiplayer/lib/socket';
+import { emitWithAck, getPlayerId } from '@/features/multiplayer/lib/socket';
 import { GAME_MODE_LABELS, GameMode, RoomResponse } from '@/features/multiplayer/types';
 
 export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
@@ -11,6 +11,7 @@ export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const description = gameMode === 'formula-workshop'
     ? '동일한 숫자로 더 많은 수식을 찾아 경쟁하세요.'
     : gameMode === 'sequence-detective'
@@ -26,34 +27,46 @@ export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
     return () => window.clearTimeout(update);
   }, []);
 
-  const handleCreateRoom = () => {
+  const handleCreateRoom = async () => {
+    if (isSubmitting) return;
     if (!username.trim()) return setError('닉네임을 입력해주세요.');
     localStorage.setItem('numbering_username', username);
 
-    const socket = getSocket();
-    socket.emit('create_room', { username, gameMode }, (res: RoomResponse) => {
+    setIsSubmitting(true);
+    try {
+      const res = await emitWithAck<RoomResponse>('create_room', { username, gameMode, playerId: getPlayerId() });
+      setIsSubmitting(false);
       if (res.success) {
         router.push(`/multi/room/${res.roomId}`);
       } else {
         setError(res.message || '방 생성에 실패했습니다.');
       }
-    });
+    } catch {
+      setIsSubmitting(false);
+      setError('서버 응답이 없습니다. 잠시 후 다시 시도해주세요.');
+    }
   };
 
-  const handleJoinRoom = () => {
+  const handleJoinRoom = async () => {
+    if (isSubmitting) return;
     if (!username.trim()) return setError('닉네임을 입력해주세요.');
     if (!roomCode.trim()) return setError('방 코드를 입력해주세요.');
     localStorage.setItem('numbering_username', username);
 
-    const socket = getSocket();
     const cleanRoomCode = roomCode.toUpperCase().trim();
-    socket.emit('join_room', { roomId: cleanRoomCode, username }, (res: RoomResponse) => {
+    setIsSubmitting(true);
+    try {
+      const res = await emitWithAck<RoomResponse>('join_room', { roomId: cleanRoomCode, username, playerId: getPlayerId() });
+      setIsSubmitting(false);
       if (res.success) {
         router.push(`/multi/room/${cleanRoomCode}`);
       } else {
         setError(res.message || '방 참가에 실패했습니다.');
       }
-    });
+    } catch {
+      setIsSubmitting(false);
+      setError('서버 응답이 없습니다. 잠시 후 다시 시도해주세요.');
+    }
   };
 
   return (
@@ -87,7 +100,8 @@ export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
 
           <button
             onClick={handleCreateRoom}
-            className="w-full py-4 rounded-2xl bg-[#111111] text-white font-medium hover:bg-[#222222] transition-colors shadow-md active:scale-[0.98]"
+            disabled={isSubmitting}
+            className="w-full py-4 rounded-2xl bg-[#111111] text-white font-medium hover:bg-[#222222] transition-colors shadow-md active:scale-[0.98] disabled:bg-[#777777]"
           >
             새로운 방 만들기
           </button>
@@ -108,7 +122,8 @@ export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
             />
             <button
               onClick={handleJoinRoom}
-              className="w-full py-4 rounded-2xl bg-white text-[#111111] border border-[#EAEAEA] font-medium hover:bg-[#FAFAFA] hover:shadow-sm transition-all active:scale-[0.98]"
+              disabled={isSubmitting}
+              className="w-full py-4 rounded-2xl bg-white text-[#111111] border border-[#EAEAEA] font-medium hover:bg-[#FAFAFA] hover:shadow-sm transition-all active:scale-[0.98] disabled:text-[#AAAAAA]"
             >
               방 코드로 참가하기
             </button>

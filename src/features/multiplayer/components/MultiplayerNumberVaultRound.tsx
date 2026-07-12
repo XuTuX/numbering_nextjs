@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core';
 import NumberVaultEditor, { VaultDigit } from '@/features/number-vault/components/NumberVaultEditor';
 import OperatorPalette from '@/components/game/OperatorPalette';
-import { getSocket } from '@/features/multiplayer/lib/socket';
+import { emitWithAck } from '@/features/multiplayer/lib/socket';
 import { MultiplayerPuzzle, SubmissionResponse } from '@/features/multiplayer/types';
 import { buildExpression } from '@/lib/equation/buildExpression';
 import { createOperatorSlots, createParenthesisRange } from '@/lib/equation/editorState';
@@ -52,6 +52,7 @@ export default function MultiplayerNumberVaultRound({ puzzle, roomId }: Multipla
   const [lastChangedSlotIndex, setLastChangedSlotIndex] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; success: boolean } | null>(null);
   const [solved, setSolved] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 7 } }),
@@ -126,19 +127,26 @@ export default function MultiplayerNumberVaultRound({ puzzle, roomId }: Multipla
     setFeedback(null);
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (isSubmitting) return;
     if (operatorSlots.some((slot) => slot.operator === null)) {
       setFeedback({ message: '모든 숫자 사이에 연산자를 넣어주세요.', success: false });
       return;
     }
-    getSocket().emit('submit_vault', { roomId, expression }, (response: SubmissionResponse) => {
+    setIsSubmitting(true);
+    try {
+      const response = await emitWithAck<SubmissionResponse>('submit_vault', { roomId, expression });
+      setIsSubmitting(false);
       if (response.success) {
         setSolved(true);
         setFeedback({ message: '금고를 열었습니다! 1점을 획득했습니다.', success: true });
       } else {
         setFeedback({ message: response.message, success: false });
       }
-    });
+    } catch {
+      setIsSubmitting(false);
+      setFeedback({ message: '서버 응답이 없습니다. 다시 제출해주세요.', success: false });
+    }
   };
 
   return (
@@ -163,7 +171,7 @@ export default function MultiplayerNumberVaultRound({ puzzle, roomId }: Multipla
       <div className={`min-h-12 py-4 text-center text-sm font-medium ${feedback?.success ? 'text-emerald-600' : 'text-red-500'}`}>{feedback?.message}</div>
       <div className="flex gap-3">
         <button type="button" onClick={reset} disabled={solved} className="rounded-2xl border border-[#E2E2E2] px-6 py-4 disabled:text-[#BBBBBB]">초기화</button>
-        <button type="button" onClick={submit} disabled={solved} className="flex-1 rounded-2xl bg-[#111111] py-4 font-medium text-white disabled:bg-[#D5D5D5]">{solved ? '해결 완료' : '금고 열기'}</button>
+        <button type="button" onClick={submit} disabled={solved || isSubmitting} className="flex-1 rounded-2xl bg-[#111111] py-4 font-medium text-white disabled:bg-[#D5D5D5]">{solved ? '해결 완료' : '금고 열기'}</button>
       </div>
     </section>
   );

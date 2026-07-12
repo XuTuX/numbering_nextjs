@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { getSocket } from '@/features/multiplayer/lib/socket';
+import { emitWithAck } from '@/features/multiplayer/lib/socket';
 import { MultiplayerPuzzle, SubmissionResponse } from '@/features/multiplayer/types';
 
 interface MultiplayerSequenceRoundProps {
@@ -14,23 +14,29 @@ export default function MultiplayerSequenceRound({ puzzle, roomId }: Multiplayer
   const [second, setSecond] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; success: boolean } | null>(null);
   const [solved, setSolved] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!first || !second || solved) return;
+    if (!first || !second || solved || isSubmitting) return;
 
-    getSocket().emit(
-      'submit_sequence',
-      { roomId, first: Number(first), second: Number(second) },
-      (response: SubmissionResponse) => {
+    setIsSubmitting(true);
+    try {
+      const response = await emitWithAck<SubmissionResponse>(
+        'submit_sequence',
+        { roomId, first: Number(first), second: Number(second) },
+      );
+        setIsSubmitting(false);
         if (response.success) {
           setSolved(true);
           setFeedback({ message: '정답입니다! 1점을 획득했습니다.', success: true });
         } else {
           setFeedback({ message: response.message, success: false });
         }
-      },
-    );
+    } catch {
+      setIsSubmitting(false);
+      setFeedback({ message: '서버 응답이 없습니다. 다시 제출해주세요.', success: false });
+    }
   };
 
   const sanitize = (value: string) => value.replace(/[^1-9]/g, '');
@@ -51,7 +57,7 @@ export default function MultiplayerSequenceRound({ puzzle, roomId }: Multiplayer
           <input aria-label="두 번째 수" className={inputClassName} type="text" inputMode="numeric" maxLength={1} value={second} disabled={solved} onChange={(event) => { setSecond(sanitize(event.target.value)); setFeedback(null); }} placeholder="?" />
         </div>
         <div className={`min-h-12 py-4 text-center text-sm font-medium ${feedback?.success ? 'text-emerald-600' : 'text-red-500'}`}>{feedback?.message}</div>
-        <button type="submit" disabled={!first || !second || solved} className="w-full rounded-2xl bg-[#111111] py-4 font-medium text-white disabled:bg-[#D5D5D5]">
+        <button type="submit" disabled={!first || !second || solved || isSubmitting} className="w-full rounded-2xl bg-[#111111] py-4 font-medium text-white disabled:bg-[#D5D5D5]">
           {solved ? '해결 완료' : '정답 제출'}
         </button>
       </form>

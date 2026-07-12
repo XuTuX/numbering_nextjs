@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { InlineOperator, OperatorSlot } from '@/lib/equation/types';
-import { getSocket } from '@/features/multiplayer/lib/socket';
+import { emitWithAck } from '@/features/multiplayer/lib/socket';
 import { buildExpression } from '@/lib/equation/buildExpression';
 import EquationEditor from '@/components/game/EquationEditor';
 import OperatorPalette from '@/components/game/OperatorPalette';
@@ -26,6 +26,7 @@ export default function MultiplayerEquationEditor({ digits, roomId }: Multiplaye
   const [lastChangedSlotIndex, setLastChangedSlotIndex] = useState<number | null>(null);
   const [foundEquations, setFoundEquations] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<{ message: string; isError: boolean } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } });
   const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } });
@@ -68,7 +69,7 @@ export default function MultiplayerEquationEditor({ digits, roomId }: Multiplaye
   const handleDigitPointerUp = () => {
     if (selection.type !== 'range') return;
     const { startDigitIndex, endDigitIndex } = selection;
-    
+
     if (endDigitIndex === null || Math.abs(endDigitIndex - startDigitIndex) < 1) {
       setSelection({ type: 'none' });
       return;
@@ -95,22 +96,26 @@ export default function MultiplayerEquationEditor({ digits, roomId }: Multiplaye
     setSelection({ type: 'none' });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
     const currentExpression = buildExpression(digits, operatorSlots, parentheses);
-    
-    // Clear slots
-    const resetSlots = operatorSlots.map(s => ({ ...s, operator: null }));
-    setOperatorSlots(resetSlots);
-    setParentheses([]);
 
-    getSocket().emit('submit_equation', { roomId, expression: currentExpression }, (res: SubmissionResponse) => {
+    setIsSubmitting(true);
+    try {
+      const res = await emitWithAck<SubmissionResponse>('submit_equation', { roomId, expression: currentExpression });
+      setIsSubmitting(false);
       if (res.success) {
+        setOperatorSlots((current) => current.map((slot) => ({ ...slot, operator: null })));
+        setParentheses([]);
         setFoundEquations(prev => [currentExpression, ...prev]);
         setFeedback({ message: '정답입니다! 1점 획득 🎉', isError: false });
       } else {
         setFeedback({ message: res.message, isError: true });
       }
-    });
+    } catch {
+      setIsSubmitting(false);
+      setFeedback({ message: '서버 응답이 없습니다. 다시 제출해주세요.', isError: true });
+    }
   };
 
   return (
@@ -152,9 +157,10 @@ export default function MultiplayerEquationEditor({ digits, roomId }: Multiplaye
           </div>
         )}
 
-        <button 
+        <button
           onClick={handleSubmit}
-          className="w-full md:w-64 py-4 rounded-2xl bg-[#111111] text-white font-medium hover:bg-[#222222] transition-colors shadow-md active:scale-[0.98]"
+          disabled={isSubmitting}
+          className="w-full md:w-64 py-4 rounded-2xl bg-[#111111] text-white font-medium hover:bg-[#222222] transition-colors shadow-md active:scale-[0.98] disabled:bg-[#777777]"
         >
           제출하기
         </button>

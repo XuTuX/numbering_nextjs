@@ -31,6 +31,9 @@ export interface RoomSnapshot {
   status: RoomStatus;
   players: Record<string, Player>;
   gameMode: GameMode;
+  round: number;
+  timer: number;
+  puzzle: MultiplayerPuzzle | null;
 }
 
 export type RoomResponse =
