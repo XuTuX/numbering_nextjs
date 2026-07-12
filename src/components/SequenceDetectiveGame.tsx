@@ -108,13 +108,13 @@ export default function SequenceDetectiveGame({ initialPuzzle }: SequenceDetecti
                   <span className="mb-2 block text-center text-xs font-medium text-[#8A8A8A]">첫 번째 수</span>
                   <input
                     className={inputClassName}
-                    type="number"
-                    min="1"
-                    max="9"
+                    type="text"
                     inputMode="numeric"
+                    pattern="[1-9]"
+                    maxLength={1}
                     value={firstGuess}
                     onChange={(event) => {
-                      setFirstGuess(event.target.value);
+                      setFirstGuess(event.target.value.replace(/[^1-9]/g, ''));
                       setResult('playing');
                     }}
                     placeholder="?"
@@ -126,13 +126,13 @@ export default function SequenceDetectiveGame({ initialPuzzle }: SequenceDetecti
                   <span className="mb-2 block text-center text-xs font-medium text-[#8A8A8A]">두 번째 수</span>
                   <input
                     className={inputClassName}
-                    type="number"
-                    min="1"
-                    max="9"
+                    type="text"
                     inputMode="numeric"
+                    pattern="[1-9]"
+                    maxLength={1}
                     value={secondGuess}
                     onChange={(event) => {
-                      setSecondGuess(event.target.value);
+                      setSecondGuess(event.target.value.replace(/[^1-9]/g, ''));
                       setResult('playing');
                     }}
                     placeholder="?"
