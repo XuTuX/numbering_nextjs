@@ -297,13 +297,14 @@ export default function MultiplayerRoom() {
             key={`${round}-${puzzleSeq}-${puzzle.digitString}`}
             digits={puzzle.digits}
             roomId={roomId}
+            puzzleSeq={puzzleSeq}
           />
         )}
         {puzzle?.mode === 'sequence-detective' && (
-          <MultiplayerSequenceRound key={`${round}-${puzzleSeq}`} puzzle={puzzle} roomId={roomId} />
+          <MultiplayerSequenceRound key={`${round}-${puzzleSeq}`} puzzle={puzzle} roomId={roomId} puzzleSeq={puzzleSeq} />
         )}
         {puzzle?.mode === 'number-vault' && (
-          <MultiplayerNumberVaultRound key={`${round}-${puzzleSeq}`} puzzle={puzzle} roomId={roomId} />
+          <MultiplayerNumberVaultRound key={`${round}-${puzzleSeq}`} puzzle={puzzle} roomId={roomId} puzzleSeq={puzzleSeq} />
         )}
       </main>
     </div>

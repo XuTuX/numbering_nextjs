@@ -118,7 +118,7 @@ export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
               <p className="text-xs text-[#A0A0A0] px-1 leading-relaxed">
                 {format === 'classic'
                   ? '최대 5명이 3라운드 동안 같은 문제로 점수를 겨룹니다.'
-                  : '단둘이 5분 동안 각자 다른 문제를 풀며 누가 더 많이 맞히는지 겨룹니다. 상대의 문제는 서로 볼 수 없어요.'}
+                : '단둘이 5분 동안 같은 문제를 동시에 풀고, 먼저 정답을 맞힌 사람이 점수를 얻습니다.'}
               </p>
             </div>
           )}

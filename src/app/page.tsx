@@ -34,7 +34,7 @@ export default function HomePage() {
             wide
             label="BATTLE MODE"
             title="대전 모드"
-            description="두 명이 한 방에 입장해 5분 동안 세 가지 숫자 게임을 무작위로 풀고 점수를 겨룹니다."
+            description="두 명이 한 방에 입장해 같은 랜덤 문제를 동시에 풀고, 5분 동안 누가 더 빨리 많이 맞히는지 겨룹니다."
             href="/multi?mode=mixed"
           />
         </div>

@@ -24,6 +24,7 @@ import { InlineOperator, OperatorSlot, ParenthesisRange } from '@/lib/equation/t
 interface MultiplayerNumberVaultRoundProps {
   puzzle: Extract<MultiplayerPuzzle, { mode: 'number-vault' }>;
   roomId: string;
+  puzzleSeq: number;
 }
 
 function makeDigits(numbers: number[]): VaultDigit[] {
@@ -42,7 +43,7 @@ const collisionDetection: CollisionDetection = (args) => {
   });
 };
 
-export default function MultiplayerNumberVaultRound({ puzzle, roomId }: MultiplayerNumberVaultRoundProps) {
+export default function MultiplayerNumberVaultRound({ puzzle, roomId, puzzleSeq }: MultiplayerNumberVaultRoundProps) {
   const [digits, setDigits] = useState(() => makeDigits(puzzle.numbers));
   const [operatorSlots, setOperatorSlots] = useState<OperatorSlot[]>(() => createOperatorSlots(puzzle.numbers.length));
   const [parentheses, setParentheses] = useState<ParenthesisRange[]>([]);
@@ -135,7 +136,7 @@ export default function MultiplayerNumberVaultRound({ puzzle, roomId }: Multipla
     }
     setIsSubmitting(true);
     try {
-      const response = await emitWithAck<SubmissionResponse>('submit_vault', { roomId, expression });
+      const response = await emitWithAck<SubmissionResponse>('submit_vault', { roomId, expression, puzzleSeq });
       setIsSubmitting(false);
       if (response.success) {
         setSolved(true);

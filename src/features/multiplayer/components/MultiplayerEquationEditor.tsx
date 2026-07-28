@@ -14,9 +14,10 @@ import { createOperatorSlots, createParenthesisRange } from '@/lib/equation/edit
 interface MultiplayerEquationEditorProps {
   digits: string[];
   roomId: string;
+  puzzleSeq: number;
 }
 
-export default function MultiplayerEquationEditor({ digits, roomId }: MultiplayerEquationEditorProps) {
+export default function MultiplayerEquationEditor({ digits, roomId, puzzleSeq }: MultiplayerEquationEditorProps) {
   const [operatorSlots, setOperatorSlots] = useState<OperatorSlot[]>(() =>
     createOperatorSlots(digits.length),
   );
@@ -102,7 +103,7 @@ export default function MultiplayerEquationEditor({ digits, roomId }: Multiplaye
 
     setIsSubmitting(true);
     try {
-      const res = await emitWithAck<SubmissionResponse>('submit_equation', { roomId, expression: currentExpression });
+      const res = await emitWithAck<SubmissionResponse>('submit_equation', { roomId, expression: currentExpression, puzzleSeq });
       setIsSubmitting(false);
       if (res.success) {
         setOperatorSlots((current) => current.map((slot) => ({ ...slot, operator: null })));

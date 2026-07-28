@@ -7,9 +7,10 @@ import { MultiplayerPuzzle, SubmissionResponse } from '@/features/multiplayer/ty
 interface MultiplayerSequenceRoundProps {
   puzzle: Extract<MultiplayerPuzzle, { mode: 'sequence-detective' }>;
   roomId: string;
+  puzzleSeq: number;
 }
 
-export default function MultiplayerSequenceRound({ puzzle, roomId }: MultiplayerSequenceRoundProps) {
+export default function MultiplayerSequenceRound({ puzzle, roomId, puzzleSeq }: MultiplayerSequenceRoundProps) {
   const [first, setFirst] = useState('');
   const [second, setSecond] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; success: boolean } | null>(null);
@@ -24,7 +25,7 @@ export default function MultiplayerSequenceRound({ puzzle, roomId }: Multiplayer
     try {
       const response = await emitWithAck<SubmissionResponse>(
         'submit_sequence',
-        { roomId, first: Number(first), second: Number(second) },
+        { roomId, first: Number(first), second: Number(second), puzzleSeq },
       );
         setIsSubmitting(false);
         if (response.success) {
