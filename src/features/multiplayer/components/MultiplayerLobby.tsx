@@ -8,12 +8,15 @@ import { GAME_MODE_LABELS, GameMode, RoomFormat, RoomResponse } from '@/features
 
 export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
   const router = useRouter();
+  const isMixedDuel = gameMode === 'mixed';
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [format, setFormat] = useState<RoomFormat>('classic');
-  const description = gameMode === 'formula-workshop'
+  const [format, setFormat] = useState<RoomFormat>(isMixedDuel ? 'duel' : 'classic');
+  const description = isMixedDuel
+    ? '두 명이 5분 동안 세 가지 숫자 게임을 무작위로 풀어 더 높은 점수에 도전합니다.'
+    : gameMode === 'formula-workshop'
     ? '동일한 숫자로 더 많은 수식을 찾아 경쟁하세요.'
     : gameMode === 'sequence-detective'
       ? '같은 수열 단서를 보고 먼저 시작 숫자를 찾아보세요.'
@@ -73,43 +76,52 @@ export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
   return (
     <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col items-center justify-center px-4 md:px-8 py-8 font-sans selection:bg-gray-200">
       <div className="absolute left-1/2 top-8 z-20 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 md:top-12 md:w-[calc(100%-4rem)]">
-        <Link href={`/games/${gameMode}`} className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm font-medium">
+        <Link href={isMixedDuel ? '/' : `/games/${gameMode}`} className="text-[#8A8A8A] hover:text-[#111111] transition-colors text-sm font-medium">
           ← 게임 모드
         </Link>
       </div>
 
       <div className="w-full max-w-md flex flex-col items-center bg-white p-10 rounded-3xl border border-[#EAEAEA] shadow-sm">
         <p className="text-xs font-semibold tracking-[0.18em] text-[#8A8A8A] mb-2">{GAME_MODE_LABELS[gameMode]}</p>
-        <h1 className="text-4xl font-medium text-[#111111] tracking-wide mb-3">MULTI</h1>
+        <h1 className="text-4xl font-medium text-[#111111] tracking-wide mb-3">{isMixedDuel ? 'DUEL' : 'MULTI'}</h1>
         <p className="text-[#8A8A8A] text-center mb-8 leading-relaxed">
           {description}
         </p>
 
         <div className="w-full flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-medium text-[#8A8A8A] px-1">방 만들기 모드</label>
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[#FAFAFA] border border-[#EAEAEA]">
-              <button
-                type="button"
-                onClick={() => setFormat('classic')}
-                className={`py-3 rounded-xl text-sm font-medium transition-colors ${format === 'classic' ? 'bg-[#111111] text-white shadow-sm' : 'text-[#8A8A8A] hover:text-[#111111]'}`}
-              >
-                친선전 (최대 5명)
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormat('duel')}
-                className={`py-3 rounded-xl text-sm font-medium transition-colors ${format === 'duel' ? 'bg-[#111111] text-white shadow-sm' : 'text-[#8A8A8A] hover:text-[#111111]'}`}
-              >
-                1:1 대결 (2명)
-              </button>
+          {isMixedDuel ? (
+            <div className="rounded-2xl border border-[#EAEAEA] bg-[#FAFAFA] px-5 py-4">
+              <p className="text-sm font-medium text-[#111111]">1:1 · 5분 · 랜덤 3종</p>
+              <p className="mt-1 text-xs leading-relaxed text-[#8A8A8A]">
+                수식 공방, 수열 탐정, 숫자 금고가 무작위 순서로 출제됩니다.
+              </p>
             </div>
-            <p className="text-xs text-[#A0A0A0] px-1 leading-relaxed">
-              {format === 'classic'
-                ? '최대 5명이 3라운드 동안 같은 문제로 점수를 겨룹니다.'
-                : '단둘이 5분 동안 각자 다른 문제를 풀며 누가 더 많이 맞히는지 겨룹니다. 상대의 문제는 서로 볼 수 없어요.'}
-            </p>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-[#8A8A8A] px-1">방 만들기 모드</label>
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[#FAFAFA] border border-[#EAEAEA]">
+                <button
+                  type="button"
+                  onClick={() => setFormat('classic')}
+                  className={`py-3 rounded-xl text-sm font-medium transition-colors ${format === 'classic' ? 'bg-[#111111] text-white shadow-sm' : 'text-[#8A8A8A] hover:text-[#111111]'}`}
+                >
+                  친선전 (최대 5명)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormat('duel')}
+                  className={`py-3 rounded-xl text-sm font-medium transition-colors ${format === 'duel' ? 'bg-[#111111] text-white shadow-sm' : 'text-[#8A8A8A] hover:text-[#111111]'}`}
+                >
+                  1:1 대결 (2명)
+                </button>
+              </div>
+              <p className="text-xs text-[#A0A0A0] px-1 leading-relaxed">
+                {format === 'classic'
+                  ? '최대 5명이 3라운드 동안 같은 문제로 점수를 겨룹니다.'
+                  : '단둘이 5분 동안 각자 다른 문제를 풀며 누가 더 많이 맞히는지 겨룹니다. 상대의 문제는 서로 볼 수 없어요.'}
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2">
             <label className="text-xs font-medium text-[#8A8A8A] px-1">닉네임</label>

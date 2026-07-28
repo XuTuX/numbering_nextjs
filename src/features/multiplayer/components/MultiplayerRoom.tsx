@@ -169,7 +169,7 @@ export default function MultiplayerRoom() {
         <div className="w-full max-w-md bg-white p-8 rounded-3xl border border-[#EAEAEA] shadow-sm flex flex-col items-center">
           <p className="text-xs text-[#8A8A8A] font-medium tracking-widest mb-2">ROOM CODE</p>
           <h1 className="text-5xl font-mono font-bold text-[#111111] tracking-widest mb-10">{roomId}</h1>
-          <p className="-mt-7 mb-8 text-sm font-medium text-[#666666]">{GAME_MODE_LABELS[gameMode]}{isDuel ? ' · 1:1 대결' : ''}</p>
+          <p className="-mt-7 mb-8 text-sm font-medium text-[#666666]">{GAME_MODE_LABELS[gameMode]}{isDuel && gameMode !== 'mixed' ? ' · 1:1 대결' : ''}</p>
 
           <div className="w-full flex flex-col gap-2 mb-10">
             <h3 className="text-sm font-medium text-[#8A8A8A] px-2 mb-2">Players ({sortedPlayers.length}/{maxPlayers})</h3>
@@ -265,7 +265,7 @@ export default function MultiplayerRoom() {
       <header className="w-full flex justify-between items-center p-6 md:p-8 absolute top-0 left-0 right-0 z-10">
         <div className="flex flex-col items-start">
           <span className="text-xs font-bold text-[#8A8A8A] tracking-widest uppercase mb-1">
-            {isDuel ? '1:1 대결' : `ROUND ${round}/${MULTIPLAYER_ROUNDS}`}
+            {isDuel ? (gameMode === 'mixed' ? '랜덤 3종 · 1:1 대결' : '1:1 대결') : `ROUND ${round}/${MULTIPLAYER_ROUNDS}`}
           </span>
           <span className="text-lg font-mono font-medium text-[#111111] tracking-widest">
             {formatTime(timer)}

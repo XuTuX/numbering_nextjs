@@ -30,6 +30,13 @@ export default function HomePage() {
             description="숫자 카드를 원하는 순서로 조합해 금고의 목표 숫자를 만들어 보세요."
             href="/games/number-vault"
           />
+          <GameModeCard
+            wide
+            label="BATTLE MODE"
+            title="대전 모드"
+            description="두 명이 한 방에 입장해 5분 동안 세 가지 숫자 게임을 무작위로 풀고 점수를 겨룹니다."
+            href="/multi?mode=mixed"
+          />
         </div>
       </main>
     </div>

@@ -5,17 +5,25 @@ export interface Player {
   connected: boolean;
 }
 
-export type GameMode = 'formula-workshop' | 'sequence-detective' | 'number-vault';
+export const PUZZLE_GAME_MODES = [
+  'formula-workshop',
+  'sequence-detective',
+  'number-vault',
+] as const;
+
+export type PuzzleGameMode = (typeof PUZZLE_GAME_MODES)[number];
+export type GameMode = PuzzleGameMode | 'mixed';
 export const MULTIPLAYER_ROUNDS = 3;
 
 export const GAME_MODE_LABELS: Record<GameMode, string> = {
   'formula-workshop': '수식 공방',
   'sequence-detective': '수열 탐정',
   'number-vault': '숫자 금고',
+  mixed: '랜덤 3종 대전',
 };
 
 export function normalizeGameMode(value?: string): GameMode {
-  if (value === 'sequence-detective' || value === 'number-vault') return value;
+  if (value === 'sequence-detective' || value === 'number-vault' || value === 'mixed') return value;
   return 'formula-workshop';
 }
 

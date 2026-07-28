@@ -18,6 +18,8 @@ import {
   normalizeGameMode,
   normalizeRoomFormat,
   Player,
+  PUZZLE_GAME_MODES,
+  PuzzleGameMode,
   RoomFormat,
   RoomSnapshot,
   RoomStatus,
@@ -56,6 +58,7 @@ interface Room {
   duelPuzzles: Record<string, MultiplayerPuzzle>;
   duelSequenceAnswers: Record<string, { first: number; second: number } | null>;
   duelPuzzleSeq: Record<string, number>;
+  duelGameModeSequence: PuzzleGameMode[];
 }
 
 const rooms = new Map<string, Room>();
@@ -111,7 +114,7 @@ function allConnectedPlayersSolved(room: Room) {
   return connectedIds.length > 0 && connectedIds.every((socketId) => room.solvedPlayers[socketId]);
 }
 
-function generatePuzzleData(gameMode: GameMode, progressionRound: number): {
+function generatePuzzleData(gameMode: PuzzleGameMode, progressionRound: number): {
   puzzle: MultiplayerPuzzle;
   sequenceAnswer: { first: number; second: number } | null;
 } {
@@ -134,6 +137,15 @@ function generatePuzzleData(gameMode: GameMode, progressionRound: number): {
     puzzle: { mode: 'formula-workshop', digits: puzzle.digits, digitString: puzzle.digitString },
     sequenceAnswer: null,
   };
+}
+
+function shuffledPuzzleGameModes() {
+  const modes = [...PUZZLE_GAME_MODES];
+  for (let index = modes.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [modes[index], modes[randomIndex]] = [modes[randomIndex], modes[index]];
+  }
+  return modes;
 }
 
 app.prepare().then(() => {
@@ -160,7 +172,7 @@ app.prepare().then(() => {
 
   function startRound(roomId: string) {
     const room = rooms.get(roomId);
-    if (!room) return;
+    if (!room || room.gameMode === 'mixed') return;
 
     room.status = 'PLAYING';
     room.timer = ROUND_TIME;
@@ -203,10 +215,17 @@ app.prepare().then(() => {
   // --- Duel mode: each player has their own private puzzle stream ---
 
   function dealDuelPuzzle(room: Room, socketId: string) {
-    const { puzzle, sequenceAnswer } = generatePuzzleData(room.gameMode, DUEL_PROGRESSION_ROUND);
+    const puzzleIndex = room.duelPuzzleSeq[socketId] ?? 0;
+    while (room.duelGameModeSequence.length <= puzzleIndex) {
+      room.duelGameModeSequence.push(...shuffledPuzzleGameModes());
+    }
+    const puzzleGameMode = room.gameMode === 'mixed'
+      ? room.duelGameModeSequence[puzzleIndex]
+      : room.gameMode;
+    const { puzzle, sequenceAnswer } = generatePuzzleData(puzzleGameMode, DUEL_PROGRESSION_ROUND);
     room.duelPuzzles[socketId] = puzzle;
     room.duelSequenceAnswers[socketId] = sequenceAnswer;
-    room.duelPuzzleSeq[socketId] = (room.duelPuzzleSeq[socketId] ?? 0) + 1;
+    room.duelPuzzleSeq[socketId] = puzzleIndex + 1;
 
     io.to(socketId).emit('round_started', {
       round: room.round,
@@ -224,6 +243,7 @@ app.prepare().then(() => {
     room.status = 'PLAYING';
     room.round = 1;
     room.timer = DUEL_TIME;
+    room.duelGameModeSequence = [];
 
     Object.values(room.players)
       .filter((player) => player.connected)
@@ -278,14 +298,15 @@ app.prepare().then(() => {
       const roomId = createRoomId();
       const resolvedUsername = sanitizeUsername(username);
       const resolvedPlayerId = String(playerId || socket.id);
+      const resolvedGameMode = normalizeGameMode(gameMode);
       const newRoom: Room = {
         roomId,
         hostId: socket.id,
         status: 'LOBBY',
         round: 1,
         timer: 0,
-        gameMode: normalizeGameMode(gameMode),
-        format: normalizeRoomFormat(format),
+        gameMode: resolvedGameMode,
+        format: resolvedGameMode === 'mixed' ? 'duel' : normalizeRoomFormat(format),
         puzzle: null,
         puzzleSeq: 0,
         sequenceAnswer: null,
@@ -295,6 +316,7 @@ app.prepare().then(() => {
         duelPuzzles: {},
         duelSequenceAnswers: {},
         duelPuzzleSeq: {},
+        duelGameModeSequence: [],
       };
 
       newRoom.players[socket.id] = {
