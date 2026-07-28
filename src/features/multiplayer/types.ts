@@ -19,6 +19,20 @@ export function normalizeGameMode(value?: string): GameMode {
   return 'formula-workshop';
 }
 
+export type RoomFormat = 'classic' | 'duel';
+export const DUEL_TIME = 300;
+export const DUEL_MAX_PLAYERS = 2;
+export const CLASSIC_MAX_PLAYERS = 5;
+
+export const ROOM_FORMAT_LABELS: Record<RoomFormat, string> = {
+  classic: '친선전',
+  duel: '1:1 대결',
+};
+
+export function normalizeRoomFormat(value?: string): RoomFormat {
+  return value === 'duel' ? 'duel' : 'classic';
+}
+
 export type RoomStatus = 'LOBBY' | 'PLAYING' | 'ROUND_END' | 'GAME_END';
 
 export type MultiplayerPuzzle =
@@ -31,9 +45,11 @@ export interface RoomSnapshot {
   status: RoomStatus;
   players: Record<string, Player>;
   gameMode: GameMode;
+  format: RoomFormat;
   round: number;
   timer: number;
   puzzle: MultiplayerPuzzle | null;
+  puzzleSeq: number;
 }
 
 export type RoomResponse =
@@ -45,6 +61,7 @@ export interface RoundStartedPayload {
   round: number;
   timer: number;
   puzzle: MultiplayerPuzzle;
+  puzzleSeq: number;
 }
 
 export interface RoundEndedPayload {

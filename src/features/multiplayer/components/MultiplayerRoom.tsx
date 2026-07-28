@@ -6,12 +6,15 @@ import { emitWithAck, getPlayerId, getSocket } from '@/features/multiplayer/lib/
 import Link from 'next/link';
 import MultiplayerEquationEditor from '@/features/multiplayer/components/MultiplayerEquationEditor';
 import {
+  DUEL_MAX_PLAYERS,
+  CLASSIC_MAX_PLAYERS,
   GameMode,
   GAME_MODE_LABELS,
   GameEndedPayload,
   MultiplayerPuzzle,
   MULTIPLAYER_ROUNDS,
   Player,
+  RoomFormat,
   RoomResponse,
   RoomStatus,
   RoundEndedPayload,
@@ -31,7 +34,9 @@ export default function MultiplayerRoom() {
   const [round, setRound] = useState(1);
   const [timer, setTimer] = useState(0);
   const [gameMode, setGameMode] = useState<GameMode>('formula-workshop');
+  const [format, setFormat] = useState<RoomFormat>('classic');
   const [puzzle, setPuzzle] = useState<MultiplayerPuzzle | null>(null);
+  const [puzzleSeq, setPuzzleSeq] = useState(0);
   const [hostId, setHostId] = useState('');
   const [socketId, setSocketId] = useState('');
 
@@ -57,9 +62,11 @@ export default function MultiplayerRoom() {
           setPlayers(res.room.players);
           setStatus(res.room.status);
           setGameMode(res.room.gameMode);
+          setFormat(res.room.format);
           setRound(res.room.round);
           setTimer(res.room.timer);
           setPuzzle(res.room.puzzle);
+          setPuzzleSeq(res.room.puzzleSeq);
           setHostId(res.room.hostId);
         }
       } catch {
@@ -87,6 +94,7 @@ export default function MultiplayerRoom() {
       setRound(data.round);
       setTimer(data.timer);
       setPuzzle(data.puzzle);
+      setPuzzleSeq(data.puzzleSeq);
     });
 
     socket.on('timer_sync', (time: number) => setTimer(time));
@@ -146,6 +154,9 @@ export default function MultiplayerRoom() {
     .filter(p => p.connected)
     .sort((a, b) => b.score - a.score);
   const isHost = hostId === socketId;
+  const isDuel = format === 'duel';
+  const maxPlayers = isDuel ? DUEL_MAX_PLAYERS : CLASSIC_MAX_PLAYERS;
+  const canStartDuel = !isDuel || sortedPlayers.length === DUEL_MAX_PLAYERS;
 
   if (status === 'LOBBY') {
     return (
@@ -158,10 +169,10 @@ export default function MultiplayerRoom() {
         <div className="w-full max-w-md bg-white p-8 rounded-3xl border border-[#EAEAEA] shadow-sm flex flex-col items-center">
           <p className="text-xs text-[#8A8A8A] font-medium tracking-widest mb-2">ROOM CODE</p>
           <h1 className="text-5xl font-mono font-bold text-[#111111] tracking-widest mb-10">{roomId}</h1>
-          <p className="-mt-7 mb-8 text-sm font-medium text-[#666666]">{GAME_MODE_LABELS[gameMode]}</p>
+          <p className="-mt-7 mb-8 text-sm font-medium text-[#666666]">{GAME_MODE_LABELS[gameMode]}{isDuel ? ' · 1:1 대결' : ''}</p>
 
           <div className="w-full flex flex-col gap-2 mb-10">
-            <h3 className="text-sm font-medium text-[#8A8A8A] px-2 mb-2">Players ({sortedPlayers.length}/5)</h3>
+            <h3 className="text-sm font-medium text-[#8A8A8A] px-2 mb-2">Players ({sortedPlayers.length}/{maxPlayers})</h3>
             {sortedPlayers.map((p) => (
               <div key={p.socketId} className="flex items-center justify-between px-5 py-4 rounded-2xl bg-[#FAFAFA] border border-[#EAEAEA]">
                 <span className="font-medium text-[#111111]">{p.username} {p.socketId === socketId ? '(나)' : ''}</span>
@@ -174,12 +185,15 @@ export default function MultiplayerRoom() {
           {isHost ? (
             <button
               onClick={handleStartGame}
-              className="w-full py-4 rounded-2xl bg-[#111111] text-white font-medium hover:bg-[#222222] transition-colors shadow-md active:scale-[0.98]"
+              disabled={!canStartDuel}
+              className="w-full py-4 rounded-2xl bg-[#111111] text-white font-medium hover:bg-[#222222] transition-colors shadow-md active:scale-[0.98] disabled:bg-[#D5D5D5] disabled:shadow-none"
             >
-              게임 시작하기
+              {canStartDuel ? '게임 시작하기' : '상대를 기다리는 중...'}
             </button>
           ) : (
-            <p className="text-[#8A8A8A] text-sm text-center">방장이 게임을 시작할 때까지 대기하세요...</p>
+            <p className="text-[#8A8A8A] text-sm text-center">
+              {canStartDuel ? '방장이 게임을 시작할 때까지 대기하세요...' : '상대가 들어오길 기다리는 중...'}
+            </p>
           )}
         </div>
       </div>
@@ -212,11 +226,20 @@ export default function MultiplayerRoom() {
   }
 
   if (status === 'GAME_END') {
+    const isTie = isDuel && sortedPlayers.length === 2 && sortedPlayers[0]?.score === sortedPlayers[1]?.score;
+    const winner = isDuel && !isTie ? sortedPlayers[0] : null;
+
     return (
       <div className="min-h-[100dvh] bg-[#FAFAFA] flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md bg-[#111111] p-10 rounded-3xl shadow-xl flex flex-col items-center animate-in zoom-in-95 duration-500">
-          <h1 className="text-4xl font-bold text-white mb-2 tracking-wide">최종 순위</h1>
-          <p className="text-[#A0A0A0] mb-10">모든 라운드가 종료되었습니다.</p>
+          <h1 className="text-4xl font-bold text-white mb-2 tracking-wide">{isDuel ? '대결 종료' : '최종 순위'}</h1>
+          {isDuel ? (
+            <p className="text-[#A0A0A0] mb-10">
+              {isTie ? '무승부입니다.' : <>승자: <span className="text-white font-semibold">{winner?.username}</span></>}
+            </p>
+          ) : (
+            <p className="text-[#A0A0A0] mb-10">모든 라운드가 종료되었습니다.</p>
+          )}
 
           <div className="w-full flex flex-col gap-3 mb-10">
             {sortedPlayers.map((p, i) => (
@@ -242,35 +265,45 @@ export default function MultiplayerRoom() {
       <header className="w-full flex justify-between items-center p-6 md:p-8 absolute top-0 left-0 right-0 z-10">
         <div className="flex flex-col items-start">
           <span className="text-xs font-bold text-[#8A8A8A] tracking-widest uppercase mb-1">
-            ROUND {round}/{MULTIPLAYER_ROUNDS}
+            {isDuel ? '1:1 대결' : `ROUND ${round}/${MULTIPLAYER_ROUNDS}`}
           </span>
           <span className="text-lg font-mono font-medium text-[#111111] tracking-widest">
             {formatTime(timer)}
           </span>
         </div>
-        <div className="text-right">
-          <span className="block text-sm font-medium text-[#111111]">
-            나의 점수: {players[socketId]?.score || 0}점
-          </span>
-          <span className="block text-xs text-[#8A8A8A]">
-            1등: {sortedPlayers[0]?.score || 0}점 ({sortedPlayers[0]?.username})
-          </span>
-        </div>
+        {isDuel ? (
+          <div className="flex items-center gap-4 text-right">
+            {sortedPlayers.map((p) => (
+              <span key={p.socketId} className={`text-sm font-medium ${p.socketId === socketId ? 'text-[#111111]' : 'text-[#8A8A8A]'}`}>
+                {p.username}{p.socketId === socketId ? ' (나)' : ''}: {p.score}점
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="text-right">
+            <span className="block text-sm font-medium text-[#111111]">
+              나의 점수: {players[socketId]?.score || 0}점
+            </span>
+            <span className="block text-xs text-[#8A8A8A]">
+              1등: {sortedPlayers[0]?.score || 0}점 ({sortedPlayers[0]?.username})
+            </span>
+          </div>
+        )}
       </header>
 
       <main className="flex-grow flex flex-col items-center justify-center w-full max-w-5xl mx-auto px-4 mt-20 md:mt-0">
         {puzzle?.mode === 'formula-workshop' && (
           <MultiplayerEquationEditor
-            key={`${round}-${puzzle.digitString}`}
+            key={`${round}-${puzzleSeq}-${puzzle.digitString}`}
             digits={puzzle.digits}
             roomId={roomId}
           />
         )}
         {puzzle?.mode === 'sequence-detective' && (
-          <MultiplayerSequenceRound key={round} puzzle={puzzle} roomId={roomId} />
+          <MultiplayerSequenceRound key={`${round}-${puzzleSeq}`} puzzle={puzzle} roomId={roomId} />
         )}
         {puzzle?.mode === 'number-vault' && (
-          <MultiplayerNumberVaultRound key={round} puzzle={puzzle} roomId={roomId} />
+          <MultiplayerNumberVaultRound key={`${round}-${puzzleSeq}`} puzzle={puzzle} roomId={roomId} />
         )}
       </main>
     </div>

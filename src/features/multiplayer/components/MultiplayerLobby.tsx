@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { emitWithAck, getPlayerId } from '@/features/multiplayer/lib/socket';
-import { GAME_MODE_LABELS, GameMode, RoomResponse } from '@/features/multiplayer/types';
+import { GAME_MODE_LABELS, GameMode, RoomFormat, RoomResponse } from '@/features/multiplayer/types';
 
 export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
   const router = useRouter();
@@ -12,6 +12,7 @@ export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [format, setFormat] = useState<RoomFormat>('classic');
   const description = gameMode === 'formula-workshop'
     ? '동일한 숫자로 더 많은 수식을 찾아 경쟁하세요.'
     : gameMode === 'sequence-detective'
@@ -34,7 +35,7 @@ export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
 
     setIsSubmitting(true);
     try {
-      const res = await emitWithAck<RoomResponse>('create_room', { username, gameMode, playerId: getPlayerId() });
+      const res = await emitWithAck<RoomResponse>('create_room', { username, gameMode, format, playerId: getPlayerId() });
       setIsSubmitting(false);
       if (res.success) {
         router.push(`/multi/room/${res.roomId}`);
@@ -85,6 +86,31 @@ export default function MultiplayerLobby({ gameMode }: { gameMode: GameMode }) {
         </p>
 
         <div className="w-full flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-medium text-[#8A8A8A] px-1">방 만들기 모드</label>
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[#FAFAFA] border border-[#EAEAEA]">
+              <button
+                type="button"
+                onClick={() => setFormat('classic')}
+                className={`py-3 rounded-xl text-sm font-medium transition-colors ${format === 'classic' ? 'bg-[#111111] text-white shadow-sm' : 'text-[#8A8A8A] hover:text-[#111111]'}`}
+              >
+                친선전 (최대 5명)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormat('duel')}
+                className={`py-3 rounded-xl text-sm font-medium transition-colors ${format === 'duel' ? 'bg-[#111111] text-white shadow-sm' : 'text-[#8A8A8A] hover:text-[#111111]'}`}
+              >
+                1:1 대결 (2명)
+              </button>
+            </div>
+            <p className="text-xs text-[#A0A0A0] px-1 leading-relaxed">
+              {format === 'classic'
+                ? '최대 5명이 3라운드 동안 같은 문제로 점수를 겨룹니다.'
+                : '단둘이 5분 동안 각자 다른 문제를 풀며 누가 더 많이 맞히는지 겨룹니다. 상대의 문제는 서로 볼 수 없어요.'}
+            </p>
+          </div>
+
           <div className="flex flex-col gap-2">
             <label className="text-xs font-medium text-[#8A8A8A] px-1">닉네임</label>
             <input

@@ -9,11 +9,16 @@ import { createNumberVaultPuzzle } from './src/features/number-vault/lib/createP
 import { createSequencePuzzle } from './src/features/sequence-detective/lib/createPuzzle';
 import { getDifficultyForRound } from './src/features/formula-workshop/types';
 import {
+  CLASSIC_MAX_PLAYERS,
+  DUEL_MAX_PLAYERS,
+  DUEL_TIME,
   GameMode,
   MULTIPLAYER_ROUNDS,
   MultiplayerPuzzle,
   normalizeGameMode,
+  normalizeRoomFormat,
   Player,
+  RoomFormat,
   RoomSnapshot,
   RoomStatus,
 } from './src/features/multiplayer/types';
@@ -36,11 +41,21 @@ interface Room {
   round: number;
   timer: number;
   gameMode: GameMode;
-  puzzle: MultiplayerPuzzle | null;
-  sequenceAnswer: { first: number; second: number } | null;
+  format: RoomFormat;
   players: Record<string, RoomPlayer>;
+
+  // Classic mode: one shared puzzle for the whole room.
+  puzzle: MultiplayerPuzzle | null;
+  puzzleSeq: number;
+  sequenceAnswer: { first: number; second: number } | null;
   foundEquations: Record<string, string[]>; // socketId -> array of string
   solvedPlayers: Record<string, boolean>;
+
+  // Duel mode: each player races through their own independent puzzle stream,
+  // so nobody can see or anticipate what the other player's next puzzle is.
+  duelPuzzles: Record<string, MultiplayerPuzzle>;
+  duelSequenceAnswers: Record<string, { first: number; second: number } | null>;
+  duelPuzzleSeq: Record<string, number>;
 }
 
 const rooms = new Map<string, Room>();
@@ -48,6 +63,7 @@ const rooms = new Map<string, Room>();
 const ROUND_TIME = Number.parseInt(process.env.ROUND_TIME ?? '180', 10);
 const BREAK_TIME = Number.parseInt(process.env.BREAK_TIME ?? '10', 10);
 const RECONNECT_GRACE_MS = 30_000;
+const DUEL_PROGRESSION_ROUND = 3; // fixed NORMAL difficulty — duel has no round progression
 
 function sanitizeUsername(value: unknown) {
   const username = String(value ?? '').trim().slice(0, 24);
@@ -80,9 +96,11 @@ function toRoomSnapshot(room: Room): RoomSnapshot {
     status: room.status,
     players,
     gameMode: room.gameMode,
+    format: room.format,
     round: room.round,
     timer: room.timer,
     puzzle: room.puzzle,
+    puzzleSeq: room.puzzleSeq,
   };
 }
 
@@ -91,6 +109,31 @@ function allConnectedPlayersSolved(room: Room) {
     .filter((player) => player.connected)
     .map((player) => player.socketId);
   return connectedIds.length > 0 && connectedIds.every((socketId) => room.solvedPlayers[socketId]);
+}
+
+function generatePuzzleData(gameMode: GameMode, progressionRound: number): {
+  puzzle: MultiplayerPuzzle;
+  sequenceAnswer: { first: number; second: number } | null;
+} {
+  if (gameMode === 'sequence-detective') {
+    const puzzle = createSequencePuzzle(progressionRound);
+    return {
+      puzzle: { mode: 'sequence-detective', target: puzzle.target, termCount: puzzle.termCount },
+      sequenceAnswer: { first: puzzle.first, second: puzzle.second },
+    };
+  }
+  if (gameMode === 'number-vault') {
+    const puzzle = createNumberVaultPuzzle(progressionRound);
+    return {
+      puzzle: { mode: 'number-vault', numbers: puzzle.numbers, target: puzzle.target },
+      sequenceAnswer: null,
+    };
+  }
+  const puzzle = generatePuzzle(getDifficultyForRound(progressionRound));
+  return {
+    puzzle: { mode: 'formula-workshop', digits: puzzle.digits, digitString: puzzle.digitString },
+    sequenceAnswer: null,
+  };
 }
 
 app.prepare().then(() => {
@@ -113,6 +156,8 @@ app.prepare().then(() => {
     cors: { origin: '*' },
   });
 
+  // --- Classic mode: shared round for the whole room ---
+
   function startRound(roomId: string) {
     const room = rooms.get(roomId);
     if (!room) return;
@@ -121,29 +166,11 @@ app.prepare().then(() => {
     room.timer = ROUND_TIME;
     const progressionRound = room.round === 1 ? 1 : room.round === 2 ? 3 : 7;
 
-    if (room.gameMode === 'sequence-detective') {
-      const puzzle = createSequencePuzzle(progressionRound);
-      room.puzzle = {
-        mode: 'sequence-detective',
-        target: puzzle.target,
-        termCount: puzzle.termCount,
-      };
-      room.sequenceAnswer = { first: puzzle.first, second: puzzle.second };
-    } else if (room.gameMode === 'number-vault') {
-      const puzzle = createNumberVaultPuzzle(progressionRound);
-      room.puzzle = { mode: 'number-vault', numbers: puzzle.numbers, target: puzzle.target };
-      room.sequenceAnswer = null;
-    } else {
-      const puzzle = generatePuzzle(getDifficultyForRound(progressionRound));
-      room.puzzle = {
-        mode: 'formula-workshop',
-        digits: puzzle.digits,
-        digitString: puzzle.digitString,
-      };
-      room.sequenceAnswer = null;
-    }
+    const { puzzle, sequenceAnswer } = generatePuzzleData(room.gameMode, progressionRound);
+    room.puzzle = puzzle;
+    room.sequenceAnswer = sequenceAnswer;
+    room.puzzleSeq += 1;
 
-    // Reset found equations for this round
     Object.keys(room.foundEquations).forEach(id => {
       room.foundEquations[id] = [];
     });
@@ -153,7 +180,8 @@ app.prepare().then(() => {
       round: room.round,
       timer: room.timer,
       puzzle: room.puzzle,
-      status: room.status
+      status: room.status,
+      puzzleSeq: room.puzzleSeq,
     });
   }
 
@@ -170,6 +198,36 @@ app.prepare().then(() => {
       status: room.status,
       players: toRoomSnapshot(room).players
     });
+  }
+
+  // --- Duel mode: each player has their own private puzzle stream ---
+
+  function dealDuelPuzzle(room: Room, socketId: string) {
+    const { puzzle, sequenceAnswer } = generatePuzzleData(room.gameMode, DUEL_PROGRESSION_ROUND);
+    room.duelPuzzles[socketId] = puzzle;
+    room.duelSequenceAnswers[socketId] = sequenceAnswer;
+    room.duelPuzzleSeq[socketId] = (room.duelPuzzleSeq[socketId] ?? 0) + 1;
+
+    io.to(socketId).emit('round_started', {
+      round: room.round,
+      timer: room.timer,
+      puzzle,
+      status: room.status,
+      puzzleSeq: room.duelPuzzleSeq[socketId],
+    });
+  }
+
+  function startDuel(roomId: string) {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    room.status = 'PLAYING';
+    room.round = 1;
+    room.timer = DUEL_TIME;
+
+    Object.values(room.players)
+      .filter((player) => player.connected)
+      .forEach((player) => dealDuelPuzzle(room, player.socketId));
   }
 
   function endGame(roomId: string) {
@@ -189,7 +247,11 @@ app.prepare().then(() => {
       if (room.status === 'PLAYING') {
         room.timer -= 1;
         if (room.timer <= 0) {
-          startBreak(roomId);
+          if (room.format === 'duel') {
+            endGame(roomId);
+          } else {
+            startBreak(roomId);
+          }
         } else {
           io.to(roomId).emit('timer_sync', room.timer);
         }
@@ -212,7 +274,7 @@ app.prepare().then(() => {
   io.on('connection', (socket: Socket) => {
     console.log('Client connected:', socket.id);
 
-    socket.on('create_room', ({ username, gameMode, playerId }, callback) => {
+    socket.on('create_room', ({ username, gameMode, format, playerId }, callback) => {
       const roomId = createRoomId();
       const resolvedUsername = sanitizeUsername(username);
       const resolvedPlayerId = String(playerId || socket.id);
@@ -223,11 +285,16 @@ app.prepare().then(() => {
         round: 1,
         timer: 0,
         gameMode: normalizeGameMode(gameMode),
+        format: normalizeRoomFormat(format),
         puzzle: null,
+        puzzleSeq: 0,
         sequenceAnswer: null,
         players: {},
         foundEquations: {},
         solvedPlayers: {},
+        duelPuzzles: {},
+        duelSequenceAnswers: {},
+        duelPuzzleSeq: {},
       };
 
       newRoom.players[socket.id] = {
@@ -257,10 +324,11 @@ app.prepare().then(() => {
         ([, player]) => player.playerId === resolvedPlayerId,
       );
 
+      const maxPlayers = room.format === 'duel' ? DUEL_MAX_PLAYERS : CLASSIC_MAX_PLAYERS;
       if (!existingEntry && room.status !== 'LOBBY') {
         return callback({ success: false, message: '이미 진행중인 방입니다.' });
       }
-      if (!existingEntry && Object.keys(room.players).length >= 5) {
+      if (!existingEntry && Object.keys(room.players).length >= maxPlayers) {
         return callback({ success: false, message: '방이 가득 찼습니다.' });
       }
 
@@ -277,6 +345,16 @@ app.prepare().then(() => {
         room.solvedPlayers[socket.id] = room.solvedPlayers[previousSocketId] ?? false;
         delete room.foundEquations[previousSocketId];
         delete room.solvedPlayers[previousSocketId];
+
+        if (room.duelPuzzles[previousSocketId]) {
+          room.duelPuzzles[socket.id] = room.duelPuzzles[previousSocketId];
+          room.duelSequenceAnswers[socket.id] = room.duelSequenceAnswers[previousSocketId] ?? null;
+          room.duelPuzzleSeq[socket.id] = room.duelPuzzleSeq[previousSocketId] ?? 1;
+          delete room.duelPuzzles[previousSocketId];
+          delete room.duelSequenceAnswers[previousSocketId];
+          delete room.duelPuzzleSeq[previousSocketId];
+        }
+
         if (room.hostId === previousSocketId) room.hostId = socket.id;
       } else {
         room.players[socket.id] = {
@@ -299,11 +377,28 @@ app.prepare().then(() => {
       io.to(roomId).emit('player_joined', snapshot.players);
       io.to(roomId).emit('host_changed', room.hostId);
       console.log(`${sanitizeUsername(username)} joined room ${roomId}`);
+
+      // Reconnecting mid-duel: resend this player's own in-progress puzzle privately.
+      if (room.format === 'duel' && room.status === 'PLAYING' && room.duelPuzzles[socket.id]) {
+        io.to(socket.id).emit('round_started', {
+          round: room.round,
+          timer: room.timer,
+          puzzle: room.duelPuzzles[socket.id],
+          status: room.status,
+          puzzleSeq: room.duelPuzzleSeq[socket.id] ?? 1,
+        });
+      }
     });
 
     socket.on('start_game', ({ roomId }) => {
       const room = rooms.get(roomId);
-      if (room && room.hostId === socket.id && room.status === 'LOBBY') {
+      if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
+
+      if (room.format === 'duel') {
+        const connectedCount = Object.values(room.players).filter((p) => p.connected).length;
+        if (connectedCount !== DUEL_MAX_PLAYERS) return;
+        startDuel(roomId);
+      } else {
         startRound(roomId);
       }
     });
@@ -311,9 +406,24 @@ app.prepare().then(() => {
     socket.on('submit_equation', ({ roomId, expression }, callback) => {
       const room = rooms.get(roomId);
       if (!room || room.status !== 'PLAYING') return callback({ success: false, message: '게임 진행중이 아닙니다.' });
-      if (room.puzzle?.mode !== 'formula-workshop') return callback({ success: false, message: '수식 공방 문제가 아닙니다.' });
       const player = room.players[socket.id];
       if (!player?.connected) return callback({ success: false, message: '방 참가자만 제출할 수 있습니다.' });
+
+      if (room.format === 'duel') {
+        const puzzle = room.duelPuzzles[socket.id];
+        if (puzzle?.mode !== 'formula-workshop') return callback({ success: false, message: '수식 공방 문제가 아닙니다.' });
+
+        const validation = validateEquation(expression, puzzle.digitString);
+        if (validation.valid && validation.isCorrect) {
+          player.score += 1;
+          io.to(roomId).emit('score_updated', { players: toRoomSnapshot(room).players });
+          dealDuelPuzzle(room, socket.id);
+          return callback({ success: true });
+        }
+        return callback({ success: false, message: !validation.valid ? validation.message : '올바르지 않은 수식입니다.' });
+      }
+
+      if (room.puzzle?.mode !== 'formula-workshop') return callback({ success: false, message: '수식 공방 문제가 아닙니다.' });
 
       // Clean up whitespace
       const expr = expression.replace(/\s+/g, '');
@@ -336,11 +446,30 @@ app.prepare().then(() => {
 
     socket.on('submit_sequence', ({ roomId, first, second }, callback) => {
       const room = rooms.get(roomId);
-      if (!room || room.status !== 'PLAYING' || room.puzzle?.mode !== 'sequence-detective') {
+      if (!room || room.status !== 'PLAYING') {
         return callback({ success: false, message: '수열 탐정 게임이 진행 중이 아닙니다.' });
       }
       const player = room.players[socket.id];
       if (!player?.connected) return callback({ success: false, message: '방 참가자만 제출할 수 있습니다.' });
+
+      if (room.format === 'duel') {
+        const puzzle = room.duelPuzzles[socket.id];
+        const answer = room.duelSequenceAnswers[socket.id];
+        if (puzzle?.mode !== 'sequence-detective' || !answer) {
+          return callback({ success: false, message: '수열 탐정 게임이 진행 중이 아닙니다.' });
+        }
+        const correct = answer.first === first && answer.second === second;
+        if (!correct) return callback({ success: false, message: '정답이 아닙니다.' });
+
+        player.score += 1;
+        io.to(roomId).emit('score_updated', { players: toRoomSnapshot(room).players });
+        dealDuelPuzzle(room, socket.id);
+        return callback({ success: true });
+      }
+
+      if (room.puzzle?.mode !== 'sequence-detective') {
+        return callback({ success: false, message: '수열 탐정 게임이 진행 중이 아닙니다.' });
+      }
       if (room.solvedPlayers[socket.id]) {
         return callback({ success: false, message: '이번 라운드는 이미 해결했습니다.' });
       }
@@ -356,30 +485,41 @@ app.prepare().then(() => {
 
     socket.on('submit_vault', ({ roomId, expression }, callback) => {
       const room = rooms.get(roomId);
-      if (!room || room.status !== 'PLAYING' || room.puzzle?.mode !== 'number-vault') {
+      if (!room || room.status !== 'PLAYING') {
         return callback({ success: false, message: '숫자 금고 게임이 진행 중이 아닙니다.' });
       }
       const player = room.players[socket.id];
       if (!player?.connected) return callback({ success: false, message: '방 참가자만 제출할 수 있습니다.' });
-      if (room.solvedPlayers[socket.id]) {
+
+      const activePuzzle = room.format === 'duel' ? room.duelPuzzles[socket.id] : room.puzzle;
+      if (activePuzzle?.mode !== 'number-vault') {
+        return callback({ success: false, message: '숫자 금고 게임이 진행 중이 아닙니다.' });
+      }
+      if (room.format !== 'duel' && room.solvedPlayers[socket.id]) {
         return callback({ success: false, message: '이번 라운드는 이미 해결했습니다.' });
       }
 
       const usedNumbers = (String(expression).match(/\d+/g) ?? [])
         .map((value) => Number(value))
         .sort((a: number, b: number) => a - b);
-      const expectedNumbers = [...room.puzzle.numbers].sort((a, b) => a - b);
+      const expectedNumbers = [...activePuzzle.numbers].sort((a, b) => a - b);
       if (JSON.stringify(usedNumbers) !== JSON.stringify(expectedNumbers)) {
         return callback({ success: false, message: '모든 숫자를 정확히 한 번씩 사용해야 합니다.' });
       }
       const result = evaluateExpression(expression);
-      if (!result.valid || result.value !== room.puzzle.target) {
+      if (!result.valid || result.value !== activePuzzle.target) {
         return callback({ success: false, message: result.valid ? '목표 숫자와 값이 다릅니다.' : result.message });
       }
 
-      room.solvedPlayers[socket.id] = true;
       player.score += 1;
       io.to(roomId).emit('score_updated', { players: toRoomSnapshot(room).players });
+
+      if (room.format === 'duel') {
+        dealDuelPuzzle(room, socket.id);
+        return callback({ success: true });
+      }
+
+      room.solvedPlayers[socket.id] = true;
       callback({ success: true });
       if (allConnectedPlayersSolved(room)) startBreak(roomId);
     });
@@ -390,6 +530,9 @@ app.prepare().then(() => {
         delete room.players[socket.id];
         delete room.foundEquations[socket.id];
         delete room.solvedPlayers[socket.id];
+        delete room.duelPuzzles[socket.id];
+        delete room.duelSequenceAnswers[socket.id];
+        delete room.duelPuzzleSeq[socket.id];
         socket.leave(roomId);
         io.to(roomId).emit('player_left', toRoomSnapshot(room).players);
 
@@ -402,7 +545,12 @@ app.prepare().then(() => {
         }
 
         if (Object.keys(room.players).length === 0) rooms.delete(roomId);
-        else if (room.status === 'PLAYING' && room.gameMode !== 'formula-workshop' && allConnectedPlayersSolved(room)) {
+        else if (
+          room.format !== 'duel' &&
+          room.status === 'PLAYING' &&
+          room.gameMode !== 'formula-workshop' &&
+          allConnectedPlayersSolved(room)
+        ) {
           startBreak(roomId);
         }
       }
@@ -425,7 +573,12 @@ app.prepare().then(() => {
             }
           }
 
-          if (room.status === 'PLAYING' && room.gameMode !== 'formula-workshop' && allConnectedPlayersSolved(room)) {
+          if (
+            room.format !== 'duel' &&
+            room.status === 'PLAYING' &&
+            room.gameMode !== 'formula-workshop' &&
+            allConnectedPlayersSolved(room)
+          ) {
             startBreak(roomId);
           }
 
@@ -441,6 +594,9 @@ app.prepare().then(() => {
             delete currentRoom.players[staleSocketId];
             delete currentRoom.foundEquations[staleSocketId];
             delete currentRoom.solvedPlayers[staleSocketId];
+            delete currentRoom.duelPuzzles[staleSocketId];
+            delete currentRoom.duelSequenceAnswers[staleSocketId];
+            delete currentRoom.duelPuzzleSeq[staleSocketId];
             if (Object.keys(currentRoom.players).length === 0) rooms.delete(roomId);
           }, RECONNECT_GRACE_MS);
         }
