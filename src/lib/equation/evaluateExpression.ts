@@ -32,6 +32,7 @@ export function tokenize(expr: string): Token[] {
 }
 
 function precedence(op: string) {
+  if (op === 'u+' || op === 'u-') return 3;
   if (op === '×' || op === '÷') return 2;
   if (op === '+' || op === '-') return 1;
   return 0;
@@ -46,11 +47,25 @@ export function evaluateExpression(expr: string): { valid: true; value: number }
     const ops: string[] = [];
 
     const applyOp = () => {
-      const val2 = values.pop();
-      const val1 = values.pop();
       const op = ops.pop();
 
-      if (val1 === undefined || val2 === undefined || !op) {
+      if (!op) {
+        throw new Error('수식이 올바르지 않습니다.');
+      }
+
+      if (op === 'u+' || op === 'u-') {
+        const value = values.pop();
+        if (value === undefined) {
+          throw new Error('부호 뒤에는 숫자가 필요합니다.');
+        }
+        values.push(op === 'u-' ? -value : value);
+        return;
+      }
+
+      const val2 = values.pop();
+      const val1 = values.pop();
+
+      if (val1 === undefined || val2 === undefined) {
         throw new Error('수식이 올바르지 않습니다.');
       }
 
@@ -96,7 +111,13 @@ export function evaluateExpression(expr: string): { valid: true; value: number }
         ops.pop(); // remove '('
         expectNumber = false;
       } else if (['+', '-', '×', '÷'].includes(token as string)) {
-        if (expectNumber) throw new Error('연산자 앞에는 숫자가 필요합니다.');
+        if (expectNumber) {
+          if (token !== '+' && token !== '-') {
+            throw new Error('연산자 앞에는 숫자가 필요합니다.');
+          }
+          ops.push(token === '-' ? 'u-' : 'u+');
+          continue;
+        }
         while (ops.length > 0 && precedence(ops[ops.length - 1]) >= precedence(token as string)) {
           applyOp();
         }

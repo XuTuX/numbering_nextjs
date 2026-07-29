@@ -424,8 +424,16 @@ app.prepare().then(() => {
       // Clean up whitespace
       const expr = expression.replace(/\s+/g, '');
       const foundList = room.foundEquations[socket.id] ?? (room.foundEquations[socket.id] = []);
-      if (foundList.includes(expr)) {
-        return callback({ success: false, message: '이미 찾은 수식입니다.' });
+      const existingFinderId = Object.entries(room.foundEquations).find(
+        ([, equations]) => equations.includes(expr),
+      )?.[0];
+      if (existingFinderId) {
+        return callback({
+          success: false,
+          message: existingFinderId === socket.id
+            ? '이미 찾은 수식입니다.'
+            : '다른 플레이어가 먼저 찾은 수식입니다.',
+        });
       }
 
       const validation = validateEquation(expression, room.puzzle.digitString);
